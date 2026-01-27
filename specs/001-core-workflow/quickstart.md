@@ -115,10 +115,8 @@ cd ../VoicevoxHelper.Infrastructure
 # Azure OpenAI
 dotnet add package Azure.AI.OpenAI --version 2.1.0
 
-# HTTP Client & Retry
+# HTTP Client
 dotnet add package Microsoft.Extensions.Http
-dotnet add package Microsoft.Extensions.Http.Polly
-dotnet add package Polly
 
 # CSV Parser
 dotnet add package CsvHelper --version 33.0.1
@@ -134,7 +132,9 @@ cd ../VoicevoxHelper.Tests
 
 # モックライブラリ
 dotnet add package Moq --version 4.20.72
-dotnet add package FluentAssertions --version 7.0.0
+dotnet add package NUnit --version 4.2.2
+dotnet add package NUnit3TestAdapter --version 4.6.0
+dotnet add package Microsoft.NET.Test.Sdk --version 17.13.0
 ```
 
 ---
@@ -158,7 +158,6 @@ dotnet add package FluentAssertions --version 7.0.0
   "VoiceVox": {
     "BaseUrl": "http://127.0.0.1:50021",
     "Timeout": "00:00:30",
-    "RetryCount": 3,
     "UpdateExisting": true
   },
   "Dictionary": {
@@ -379,7 +378,6 @@ dotnet run --project VoicevoxHelper.App
 
 ```csharp
 using NUnit.Framework;
-using FluentAssertions;
 using VoicevoxHelper.Core.Models;
 
 namespace VoicevoxHelper.Tests.Core;
@@ -399,9 +397,9 @@ public class DictionaryCandidateTests
         };
 
         // Assert
-        candidate.Surface.Should().Be("東京");
-        candidate.Pronunciation.Should().Be("トウキョウ");
-        candidate.AccentType.Should().Be(0);
+        Assert.That(candidate.Surface, Is.EqualTo("東京"));
+        Assert.That(candidate.Pronunciation, Is.EqualTo("トウキョウ"));
+        Assert.That(candidate.AccentType, Is.EqualTo(0));
     }
 
     [Test]

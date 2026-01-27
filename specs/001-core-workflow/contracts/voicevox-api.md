@@ -254,11 +254,10 @@ public async Task DeleteUserDictWordAsync(string uuid)
 
 ## 5. Error Handling Strategy
 
-### Retry Policy
+### Fail-fast Policy
 
-- **対象エラー**: 5xx系エラー、タイムアウト、接続エラー
-- **リトライ回数**: 最大3回
-- **待機時間**: 指数バックオフ（2秒、4秒、8秒）
+- 原則として自動リトライは行わない（失敗したらエラー終了）。
+- タイムアウト/到達不可/HTTPステータス（422/500等）を分類して表示する。
 
 ### User-Facing Error Messages
 

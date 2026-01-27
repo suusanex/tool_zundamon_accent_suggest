@@ -81,7 +81,7 @@ feature specで要求される3つのコア機能（辞書候補抽出、API登�
 ### Rationale
 
 - 公式SDKで、認証（APIキー、Entra ID）を標準サポート
-- ストリーミング、トークンカウント、リトライポリシーを統合管理
+- ストリーミング、トークンカウント等を統合管理
 - JSON mode（`response_format: {"type": "json_object"}`）でLLM出力を型安全にパース可能
 
 ### プロンプト方針
@@ -119,7 +119,7 @@ feature specで要求される3つのコア機能（辞書候補抽出、API登�
 
 ### フォールバック方針
 
-- **JSON parseエラー**: LLMに再試行を促す（最大2回）。失敗時はエラー終了し、ログに生レスポンスを記録。
+- **JSON parseエラー**: エラー終了（原則再実行はユーザー判断）。安全のため生レスポンスはログに出力しない。
 - **トークン超過**: 台本を10,000文字で切断し、エラー終了（ユーザーに分割を促す）。
 
 ### トークン最適化
@@ -256,30 +256,21 @@ VOICEVOX,ボイスボックス,3,PROPER_NOUN,7,製品名
 
 ---
 
-## 8. HTTP Client + Retry
+## 8. HTTP Client（Fail-fast）
 
 ### Decision
 
-**System.Net.Http.HttpClient** + **Polly** を使用する。
+**System.Net.Http.HttpClient** を使用する。
 
 ### Rationale
 
 - HttpClientは.NET標準で、DIコンテナからIHttpClientFactoryで注入可能。
-- Pollyはリトライ、サーキットブレーカー、タイムアウトを宣言的に記述可能。
+- 本ツールは内部ツールのため可用性よりも原因特定を優先し、原則リトライは行わない（失敗したらエラー終了）。
 
-### Retry Policy
+### Timeout Policy
 
-```csharp
-services.AddHttpClient("VOICEVOX")
-    .AddPolicyHandler(HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .WaitAndRetryAsync(3, retryAttempt => 
-            TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
-```
-
-- **対象エラー**: 5xx、タイムアウト、接続エラー
-- **リトライ回数**: 最大3回
-- **待機時間**: 指数バックオフ（2秒、4秒、8秒）
+- **タイムアウト**: appsettings.jsonで固定値を設定し、超過時は例外として扱う（リトライしない）
+- **エラー分類**: タイムアウト/到達不可/認証/バリデーション等をユーザーに明示する
 
 ---
 
@@ -330,7 +321,6 @@ services.AddHttpClient("VOICEVOX")
   "VoiceVox": {
     "BaseUrl": "http://127.0.0.1:50021",
     "Timeout": "00:00:30",
-    "RetryCount": 3,
     "UpdateExisting": true
   },
   "Dictionary": {
@@ -381,7 +371,7 @@ services.AddHttpClient("VOICEVOX")
 
 ### ユーザー向けエラー文言
 
-- **再試行可能性**: 「ネットワーク接続を確認して再試行してください」
+- **再実行案内**: 「ネットワーク接続を確認して再実行してください」
 - **対処手順**: 「設定ファイルの修正方法: [ドキュメントへのリンク]」
 
 ---
@@ -396,7 +386,7 @@ services.AddHttpClient("VOICEVOX")
 | MVVM | CommunityToolkit.Mvvm | MIT | Source Generator対応 |
 | Navigation | Page/Frame | - | WPF標準 |
 | LLM SDK | Azure.AI.OpenAI | MIT | 公式SDK |
-| HTTP Client | HttpClient + Polly | BSD-3 | リトライ/タイムアウト制御 |
+| HTTP Client | HttpClient | - | タイムアウト/例外処理 |
 | Logging | Microsoft.Extensions.Logging + Serilog | Apache 2.0 | 構造化ログ |
 | CSV Parser | CsvHelper | MS-PL / Apache 2.0 | 高速かつRFC 4180準拠 |
 | JSON Parser | System.Text.Json | MIT | .NET標準 |
@@ -421,5 +411,4 @@ services.AddHttpClient("VOICEVOX")
 - [CommunityToolkit.Mvvm Docs](https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/)
 - [Azure OpenAI .NET SDK](https://learn.microsoft.com/en-us/dotnet/api/overview/azure/ai.openai-readme)
 - [VOICEVOX Engine API Docs](https://voicevox.github.io/voicevox_engine/api/)
-- [Polly Documentation](https://www.pollydocs.org/)
 - [CsvHelper Documentation](https://joshclose.github.io/CsvHelper/)

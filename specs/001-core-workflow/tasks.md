@@ -33,8 +33,8 @@
 - [ ] T006 統合テストプロジェクトを作成 (tests/VoicevoxHelper.IntegrationTests)
 - [ ] T007 プロジェクト参照を設定（App→Core/Infrastructure、Infrastructure→Core、Tests→Core/Infrastructure）
 - [ ] T008 [P] NuGetパッケージをインストール（App: Generic Host, WPF-UI, MVVM Toolkit, Serilog）
-- [ ] T009 [P] NuGetパッケージをインストール（Infrastructure: Azure.AI.OpenAI, Polly, CsvHelper）
-- [ ] T010 [P] NuGetパッケージをインストール（Tests: NUnit, Moq, FluentAssertions）
+- [ ] T009 [P] NuGetパッケージをインストール（Infrastructure: Azure.AI.OpenAI, CsvHelper）
+- [ ] T010 [P] NuGetパッケージをインストール（Tests: NUnit, Moq）
 - [ ] T011 appsettings.jsonを作成（src/VoicevoxHelper.App/appsettings.json）
 - [ ] T012 .gitignoreを作成/更新（secrets.json, bin/, obj/, logs/ を除外）
 - [ ] T013 README.mdを作成（プロジェクト概要、ビルド手順、実行方法）
@@ -132,7 +132,7 @@
 ### 3.5 統合・テスト
 
 - [ ] T053 [US1] DI登録を追加（IMaskingService, ILlmService, ICsvParser, IJsonParser）(src/VoicevoxHelper.App/App.xaml.cs)
-- [ ] T054 [US1] 辞書抽出フロー全体のIntegration Testを作成 (tests/VoicevoxHelper.IntegrationTests/DictionaryExtractionFlowTests.cs)
+- [ ] T054 [US1] 辞書抽出フロー全体のIntegration Testを作成（スタブ/モック使用。CIで実LLMへ接続しない）(tests/VoicevoxHelper.IntegrationTests/DictionaryExtractionFlowTests.cs)
 - [ ] T055 [US1] 手動テスト：台本入力→抽出→ファイル出力→外部エディタで確認
 
 **Acceptance Criteria**:
@@ -177,8 +177,8 @@
 ### 4.4 統合・テスト
 
 - [ ] T072 [US2] DI登録を追加（IVoicevoxApiClient, IDictionaryRegistrationService）(src/VoicevoxHelper.App/App.xaml.cs)
-- [ ] T073 [US2] HttpClient + Pollyのリトライポリシーを設定 (src/VoicevoxHelper.App/App.xaml.cs)
-- [ ] T074 [US2] 辞書登録フロー全体のIntegration Testを作成 (tests/VoicevoxHelper.IntegrationTests/DictionaryRegistrationFlowTests.cs)
+- [ ] T073 [US2] HttpClientのタイムアウト設定と例外ハンドリングを設定（原則リトライしない）(src/VoicevoxHelper.App/App.xaml.cs)
+- [ ] T074 [US2] 辞書登録フロー全体のIntegration Testを作成（スタブ/モック使用。CIで実VOICEVOXへ接続しない）(tests/VoicevoxHelper.IntegrationTests/DictionaryRegistrationFlowTests.cs)
 - [ ] T075 [US2] 手動テスト：CSVファイル選択→バリデーション→登録実行→結果確認
 
 **Acceptance Criteria**:
@@ -212,7 +212,7 @@
 ### 5.3 統合・テスト
 
 - [ ] T083 [US3] DI登録を確認（ILlmServiceは既に登録済み）
-- [ ] T084 [US3] リライトフロー全体のIntegration Testを作成 (tests/VoicevoxHelper.IntegrationTests/ScriptRewriteFlowTests.cs)
+- [ ] T084 [US3] リライトフロー全体のIntegration Testを作成（スタブ/モック使用。CIで実LLMへ接続しない）(tests/VoicevoxHelper.IntegrationTests/ScriptRewriteFlowTests.cs)
 - [ ] T085 [US3] 手動テスト：台本入力→リライト実行→結果表示→コピー
 
 **Acceptance Criteria**:
@@ -268,6 +268,15 @@
 
 - [ ] T105 [P] GitHub Actions workflowを作成（ビルド・テスト自動実行）(.github/workflows/ci.yml)
 - [ ] T106 [P] Coverlet + Coveralls統合（テストカバレッジレポート）
+
+---
+
+## Additions (Policy Alignment)
+
+- [ ] T107 [P] FR-021 台本上限超過時の「分割方法」ガイダンス文言を確定し、ScriptValidatorのエラーメッセージに含める (src/VoicevoxHelper.Core/Validators/ScriptValidator.cs)
+- [ ] T108 [P] T107のUnit Testを追加（ガイダンス文言を含むことを検証）(tests/VoicevoxHelper.Tests/Core/Validators/ScriptValidatorTests.cs)
+- [ ] T109 [P] FR-024 PromptTemplatesに「辞書候補抽出のみ」等の制約文を必須化し、Unit Testで固定文言の存在を検証 (src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs, tests/VoicevoxHelper.Tests/Infrastructure/LlmService/PromptTemplatesTests.cs)
+- [ ] T110 [P] Success Criteriaの手動検証手順（時間/コスト/再現率の計測）をチェックリスト化 (specs/001-core-workflow/checklists/verification.md)
 
 **Independent Test**: 
 - 全User StoriesのAcceptance Scenariosが成功すること

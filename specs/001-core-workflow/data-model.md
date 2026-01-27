@@ -241,7 +241,6 @@ appsettings.json と secrets.json から読み込まれる設定。
 |----------|------|---------|-------------|
 | BaseUrl | string | "http://127.0.0.1:50021" | VOICEVOX APIベースURL |
 | Timeout | TimeSpan | 30秒 | タイムアウト時間 |
-| RetryCount | int | 3 | リトライ回数 |
 | UpdateExisting | bool | true | 既存単語を更新するか |
 
 ### DictionarySettings
@@ -335,7 +334,7 @@ VOICEVOX,ボイスボックス,3,PROPER_NOUN,7,製品名
 ### DR-4: トークン制限の厳格化
 
 - LLMに送信前に台本の文字数をチェック。10,000文字を超える場合はエラー終了（処理開始前）。
-- LLMレスポンスが`max_tokens`を超えた場合（不完全なJSON）は、パースエラーとして扱い、再試行（最大2回）。
+- LLMレスポンスが`max_tokens`を超えた場合（不完全なJSON）は、パースエラーとして扱い、エラー終了（原則再試行しない）。
 
 ---
 

@@ -12,9 +12,9 @@ VOICEVOX台本整形・辞書作成支援ツールは、.NET 10 WPF デスクト
 ## Technical Context
 
 **Language/Version**: C# 13 / .NET 10  
-**Primary Dependencies**: WPF, Generic Host (Microsoft.Extensions.Hosting), WPF-UI (Fluent Design), CommunityToolkit.Mvvm, Azure.AI.OpenAI, Polly, CsvHelper  
+**Primary Dependencies**: WPF, Generic Host (Microsoft.Extensions.Hosting), WPF-UI (Fluent Design), CommunityToolkit.Mvvm, Azure.AI.OpenAI, CsvHelper  
 **Storage**: ファイルシステム（appsettings.json, secrets.json, CSV/JSON辞書案ファイル）  
-**Testing**: NUnit, Moq, FluentAssertions  
+**Testing**: NUnit, Moq（Assertは`Assert.That`形式で統一）  
 **Target Platform**: Windows 10/11 (x64)  
 **Project Type**: デスクトップアプリケーション（WPF）  
 **Performance Goals**: 
@@ -43,8 +43,8 @@ VOICEVOX台本整形・辞書作成支援ツールは、.NET 10 WPF デスクト
 
 - spec.mdには**User Scenarios & Testing**が含まれており、各User Storyに**Independent Test**と**Acceptance Scenarios**が記載されている。
 - 自動テスト方針: 全Acceptance Scenarioは以下のように裏付ける：
-  - **US1（辞書候補抽出）**: Unit Test（LLM応答のモック）+ Integration Test（実VOICEVOX APIへの接続テスト）
-  - **US2（API登録）**: Integration Test（VOICEVOXモックサーバー or 実API）
+  - **US1（辞書候補抽出）**: Unit Test（LLM応答のモック）+ Integration Test（スタブ/モック。実APIへ接続しない）
+  - **US2（API登録）**: Integration Test（スタブ/モック。実APIへ接続しない）
   - **US3（リライト）**: Unit Test（LLM応答のモック）
 - 例外: LLMの出力品質評価（再現率80%）は手動レビュー（ドメイン知識を持つユーザーによる）を前提とする。これは自動化が困難なため、spec.mdの**Success Criteria**に明記済み。
 
@@ -71,7 +71,7 @@ VOICEVOX台本整形・辞書作成支援ツールは、.NET 10 WPF デスクト
 
 - 原則として処理失敗時のフォールバックは行わず、エラー原因を明確にしてエラー終了する。
 - 例: 
-  - LLM JSON parseエラー → 最大2回再試行後、失敗ならエラー終了（部分結果は保存しない）
+  - LLM JSON parseエラー → 失敗ならエラー終了（再試行しない。部分結果は保存しない）
   - 辞書登録APIエラー → 失敗した項目を`FailureDetails`に記録し、最後にレポート表示（継続可能ならスキップして次へ進む）
 - 全ての例外は`Exception.ToString()`の内容をログに出力する。
 
@@ -394,7 +394,6 @@ Step 4: 完了
 | AzureOpenAI | Timeout | TimeSpan | "00:02:00" | タイムアウト |
 | VoiceVox | BaseUrl | string | "http://127.0.0.1:50021" | VOICEVOX APIベースURL |
 | VoiceVox | Timeout | TimeSpan | "00:00:30" | タイムアウト |
-| VoiceVox | RetryCount | int | 3 | リトライ回数 |
 | VoiceVox | UpdateExisting | bool | true | 既存単語を更新するか |
 | Dictionary | DefaultFormat | string | "CSV" | 既定のファイル形式 |
 | Dictionary | DefaultEncoding | string | "UTF-8" | エンコーディング |
@@ -467,7 +466,7 @@ VOICEVOX,ボイスボックス,3,PROPER_NOUN,7,製品名
 1. **辞書候補抽出**: システムプロンプトで「JSON形式で出力」を指示。`response_format: json_object`を使用。
 2. **台本リライト**: プレーンテキスト出力。システムプロンプトで「元の意味を保持」を強調。
 
-**構造化出力**: JSON mode（Azure OpenAI API `response_format`）を使用。パース失敗時は最大2回再試行し、失敗時はエラー終了。
+**構造化出力**: JSON mode（Azure OpenAI API `response_format`）を使用。パース失敗時はエラー終了（原則再試行しない）。
 
 **トークン最適化**: 台本全体を1回の呼び出しで処理（分割しない）。システムプロンプトは共通化してキャッシュ効果を狙う。
 
@@ -497,13 +496,13 @@ VOICEVOX,ボイスボックス,3,PROPER_NOUN,7,製品名
 
 #### API失敗時の挙動
 
-- **タイムアウト**: 指数バックオフで最大3回リトライ
+- **タイムアウト**: エラー終了（原則リトライしない）
 - **接続不可**: エラー終了（"VOICEVOXが起動しているか確認してください"）
 - **1件だけ失敗**: `FailureDetails`に記録し、次へ継続（部分成功）
 
 #### ユーザー向けエラー文言
 
-- **再試行可能性**: "ネットワーク接続を確認して再試行してください"
+- **再実行案内**: "ネットワーク接続を確認して再実行してください"
 - **対処手順**: "設定ファイルの修正方法: appsettings.jsonの`VoiceVox.BaseUrl`を確認"
 
 ### 9. ログ/監査/デバッグ容易性
@@ -542,7 +541,7 @@ VOICEVOX,ボイスボックス,3,PROPER_NOUN,7,製品名
 | MVVM | CommunityToolkit.Mvvm | Source Generator対応、.NET公式推奨 |
 | Navigation | Page/Frame | WPF標準、履歴管理容易 |
 | LLM SDK | Azure.AI.OpenAI | 公式SDK、構造化出力対応 |
-| HTTP Client | HttpClient + Polly | リトライ/タイムアウト制御 |
+| HTTP Client | HttpClient | タイムアウト/例外処理 |
 | CSV Parser | CsvHelper | 高速、RFC 4180準拠 |
 | JSON Parser | System.Text.Json | .NET標準、高速 |
 

@@ -124,19 +124,11 @@ try
 }
 catch (JsonException ex)
 {
-    _logger.LogWarning("LLM応答のJSONパースに失敗: {Error}", ex.Message);
-    
-    // 再試行（最大2回）
-    if (retryCount < 2)
-    {
-        _logger.LogInformation("LLM呼び出しを再試行します ({Attempt}/2)", retryCount + 1);
-        // ... retry logic
-    }
-    else
-    {
-        _logger.LogError("LLM応答のパースに失敗しました。生レスポンス: {Response}", content);
-        throw new LlmResponseParseException("LLMの応答がJSON形式ではありませんでした。");
-    }
+  _logger.LogWarning("LLM応答のJSONパースに失敗: {Exception}", ex.ToString());
+
+  // Fail-fast（原則リトライしない）
+  _logger.LogError("LLM応答のパースに失敗しました（生レスポンスはログに出力しない）。");
+  throw new LlmResponseParseException("LLMの応答がJSON形式ではありませんでした。");
 }
 ```
 
@@ -240,21 +232,9 @@ var httpClient = new HttpClient
 };
 ```
 
-### Retry Policy (Polly)
+### Retry Policy
 
-```csharp
-services.AddHttpClient("AzureOpenAI")
-    .ConfigureHttpClient(client =>
-    {
-        client.BaseAddress = new Uri(_settings.Endpoint);
-        client.DefaultRequestHeaders.Add("api-key", _settings.ApiKey);
-    })
-    .AddPolicyHandler(HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .Or<TaskCanceledException>() // Timeout
-        .WaitAndRetryAsync(3, retryAttempt => 
-            TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
-```
+- 本ツールは原因特定を優先するため、原則として自動リトライは行わない（失敗したらエラー終了）。
 
 ---
 
@@ -325,18 +305,16 @@ _logger.LogInformation("台本: {Script}", script.Text); // 機密情報が含�
 
 - **T-LLM-1**: プロンプトテンプレートが正しく生成される
 - **T-LLM-2**: JSON応答が正しくパースされる
-- **T-LLM-3**: JSON parseエラー時に再試行される（最大2回）
-- **T-LLM-4**: Token使用量が正しく記録される
+- **T-LLM-3**: Token使用量が正しく記録される
 
 ### Integration Tests
 
-- **T-LLM-I-1**: 実際のAzure OpenAI APIを呼び出して辞書候補を抽出（環境変数で制御）
-- **T-LLM-I-2**: 実際のAzure OpenAI APIを呼び出してリライトを実行（環境変数で制御）
+- Integration Testは外部APIに接続せず、スタブ/モック（固定レスポンス）でフローを検証する。
 
 ### Mock Strategy
 
 - **Unit Test**: Azure SDKのレスポンスをMock（固定JSON）
-- **Integration Test**: 環境変数`ENABLE_LLM_INTEGRATION_TEST=1`の場合のみ実行
+- **Integration Test**: HttpMessageHandler等を差し替え、固定レスポンスで実行
 
 ---
 
