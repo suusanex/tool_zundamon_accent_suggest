@@ -1,0 +1,12 @@
+<Page x:Class="VoicevoxHelper.App.Views.ModeSelectionPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:VoicevoxHelper.App.Views.Controls">
+    <StackPanel Margin="24">
+        <TextBlock Text="モード選択" FontSize="20" FontWeight="Bold" />
+        <Button Content="辞書候補抽出" Command="{Binding NavigateDictionaryExtractionCommand}" />
+        <Button Content="辞書API登録" Command="{Binding NavigateDictionaryRegistrationCommand}" />
+        <Button Content="台本リライト" Command="{Binding NavigateScriptRewriteCommand}" />
+        <controls:ErrorDisplay Message="{Binding ErrorMessage}" />
+    </StackPanel>
+</Page>

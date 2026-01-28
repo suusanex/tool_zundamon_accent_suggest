@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VoicevoxHelper.App/VoicevoxHelper.App.csproj" />
+    <Project Path="src/VoicevoxHelper.Core/VoicevoxHelper.Core.csproj" />
+    <Project Path="src/VoicevoxHelper.Infrastructure/VoicevoxHelper.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VoicevoxHelper.IntegrationTests/VoicevoxHelper.IntegrationTests.csproj" />
+    <Project Path="tests/VoicevoxHelper.Tests/VoicevoxHelper.Tests.csproj" />
+  </Folder>
+</Solution>
