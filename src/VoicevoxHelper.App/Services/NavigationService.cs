@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VoicevoxHelper.Core.Interfaces;
 
@@ -9,11 +10,13 @@ namespace VoicevoxHelper.App.Services;
 /// </summary>
 public sealed class NavigationService : INavigationService
 {
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<NavigationService> _logger;
     private Frame? _frame;
 
-    public NavigationService(ILogger<NavigationService> logger)
+    public NavigationService(IServiceProvider serviceProvider, ILogger<NavigationService> logger)
     {
+        _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
@@ -41,7 +44,13 @@ public sealed class NavigationService : INavigationService
 
         try
         {
-            return _frame.Navigate(pageType);
+            var page = _serviceProvider.GetRequiredService(pageType);
+            if (page is not Page wpfPage)
+            {
+                throw new InvalidOperationException($"Resolved service is not a WPF Page: {pageType.FullName}");
+            }
+
+            return _frame.Navigate(wpfPage);
         }
         catch (Exception ex)
         {

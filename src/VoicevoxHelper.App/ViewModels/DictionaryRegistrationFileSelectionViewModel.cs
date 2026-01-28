@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using System.IO;
 using VoicevoxHelper.App.Services;
 using VoicevoxHelper.App.Views;
 using VoicevoxHelper.Core.Interfaces;

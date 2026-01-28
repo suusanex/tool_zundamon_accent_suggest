@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using VoicevoxHelper.App.Services;
-using Wpf.Ui.Appearance;
 using VoicevoxHelper.Core.Interfaces;
 using VoicevoxHelper.Core.Models;
 using VoicevoxHelper.Infrastructure.FileIO;
@@ -14,7 +13,6 @@ using VoicevoxHelper.Infrastructure.Services;
 using VoicevoxHelper.Infrastructure.VoicevoxApi;
 using VoicevoxHelper.App.Views;
 using VoicevoxHelper.App.ViewModels;
-using VoicevoxHelper.App.Services;
 
 namespace VoicevoxHelper.App;
 
@@ -35,9 +33,8 @@ public partial class App : Application
 			_host.Start();
 
 			var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+			MainWindow = mainWindow;
 			mainWindow.Show();
-
-			ApplicationThemeManager.Apply(ApplicationTheme.Light);
 
 			var navigation = _host.Services.GetRequiredService<INavigationService>();
 			navigation.Navigate<ModeSelectionPage>();
