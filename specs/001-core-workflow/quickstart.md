@@ -147,35 +147,25 @@ dotnet add package Microsoft.NET.Test.Sdk --version 17.13.0
 
 ```json
 {
-  "AzureOpenAI": {
+  "Llm": {
     "Endpoint": "https://your-resource.openai.azure.com/",
-    "DeploymentName": "gpt-4",
-    "ApiVersion": "2024-02-15-preview",
-    "MaxTokens": 4096,
-    "Temperature": 0.7,
-    "Timeout": "00:02:00"
+    "ApiKey": "",
+    "Deployment": "gpt-4",
+    "TimeoutSeconds": 120,
+    "PromptCostPer1kTokens": 0,
+    "CompletionCostPer1kTokens": 0
   },
-  "VoiceVox": {
+  "Voicevox": {
     "BaseUrl": "http://127.0.0.1:50021",
-    "Timeout": "00:00:30",
-    "UpdateExisting": true
+    "ApiKey": "",
+    "TimeoutSeconds": 30,
+    "UpdateExistingWords": true
   },
   "Dictionary": {
-    "DefaultFormat": "CSV",
-    "DefaultEncoding": "UTF-8",
-    "MaxFileSize": 10485760,
-    "OutputDirectory": "./output"
-  },
-  "Script": {
-    "MaxLength": 10000,
-    "EnableMasking": true
+    "UseCsvAsDefault": true
   },
   "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft": "Warning",
-      "System": "Warning"
-    }
+    "MinimumLevel": "Information"
   }
 }
 ```
@@ -188,7 +178,7 @@ dotnet add package Microsoft.NET.Test.Sdk --version 17.13.0
 
 ```json
 {
-  "AzureOpenAI": {
+  "Llm": {
     "ApiKey": "your-api-key-here"
   }
 }

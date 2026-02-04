@@ -35,11 +35,12 @@ public sealed partial class DictionaryRegistrationValidationViewModel : ViewMode
     {
         try
         {
+            _logger.LogInformation("Navigating back to file selection with {CandidateCount} candidates", CandidateCount);
             _navigationService.Navigate<DictionaryRegistrationFileSelectionPage>();
         }
         catch (Exception ex)
         {
-            _logger.LogError("Navigation failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Navigation failed while returning to file selection");
             ErrorMessage = "画面遷移に失敗しました。";
         }
     }
@@ -49,11 +50,12 @@ public sealed partial class DictionaryRegistrationValidationViewModel : ViewMode
     {
         try
         {
+            _logger.LogInformation("Navigating forward to execution with {CandidateCount} candidates", CandidateCount);
             _navigationService.Navigate<DictionaryRegistrationExecutionPage>();
         }
         catch (Exception ex)
         {
-            _logger.LogError("Navigation failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Navigation failed while moving to execution page");
             ErrorMessage = "画面遷移に失敗しました。";
         }
     }

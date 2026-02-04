@@ -58,24 +58,44 @@ public sealed partial class DictionaryExtractionInputViewModel : ViewModelBase
         {
             IsBusy = true;
             _state.ScriptText = ScriptText;
+            _logger.LogInformation(
+                "Starting extraction for script length {Length} snippet {Snippet}",
+                script.Text.Length,
+                Summarize(script.Text));
             var masked = _maskingService.Mask(ScriptText);
+            _logger.LogInformation(
+                "Masked script length {MaskedLength} snippet {MaskedSnippet}",
+                masked.MaskedText.Length,
+                Summarize(masked.MaskedText));
             var maskedScript = new Script { Text = masked.MaskedText };
             var candidates = await _llmService.ExtractDictionaryCandidatesAsync(maskedScript, CancellationToken.None);
+            _logger.LogInformation("Extraction returned {CandidateCount} candidates", candidates.Count);
             _state.DictionaryCandidates = candidates;
 
             if (!_navigationService.Navigate<DictionaryExtractionPreviewPage>())
             {
+                _logger.LogWarning("Preview navigation failed");
                 ErrorMessage = "画面遷移に失敗しました。";
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError("Extraction failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Extraction failed for script snippet {Snippet}", Summarize(script.Text));
             ErrorMessage = "辞書候補の抽出に失敗しました。";
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private static string Summarize(string text, int maxLength = 200)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        return text.Length <= maxLength ? text : text[..maxLength] + "...";
     }
 }

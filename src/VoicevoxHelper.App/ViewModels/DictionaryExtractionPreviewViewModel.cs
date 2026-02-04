@@ -26,6 +26,7 @@ public sealed partial class DictionaryExtractionPreviewViewModel : ViewModelBase
         _navigationService = navigationService;
         _logger = logger;
         Candidates = _state.DictionaryCandidates;
+        _logger.LogInformation("Preview created with {CandidateCount} candidates", Candidates.Count);
     }
 
     [ObservableProperty]
@@ -36,11 +37,12 @@ public sealed partial class DictionaryExtractionPreviewViewModel : ViewModelBase
     {
         try
         {
+            _logger.LogInformation("Navigating back from preview with {CandidateCount} candidates", Candidates.Count);
             _navigationService.Navigate<DictionaryExtractionInputPage>();
         }
         catch (Exception ex)
         {
-            _logger.LogError("Navigation failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Navigation failed while returning to extraction input");
             ErrorMessage = "画面遷移に失敗しました。";
         }
     }
@@ -50,11 +52,12 @@ public sealed partial class DictionaryExtractionPreviewViewModel : ViewModelBase
     {
         try
         {
+            _logger.LogInformation("Navigating forward from preview with {CandidateCount} candidates", Candidates.Count);
             _navigationService.Navigate<DictionaryExtractionOutputPage>();
         }
         catch (Exception ex)
         {
-            _logger.LogError("Navigation failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Navigation failed while moving to extraction output");
             ErrorMessage = "画面遷移に失敗しました。";
         }
     }

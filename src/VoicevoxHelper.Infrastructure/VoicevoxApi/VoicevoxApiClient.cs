@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,10 @@ public sealed class VoicevoxApiClient : IVoicevoxApiClient
     private readonly HttpClient _httpClient;
     private readonly VoicevoxSettings _settings;
     private readonly ILogger<VoicevoxApiClient> _logger;
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public VoicevoxApiClient(
         HttpClient httpClient,
@@ -31,102 +36,137 @@ public sealed class VoicevoxApiClient : IVoicevoxApiClient
     public async Task<IReadOnlyDictionary<string, VoicevoxDictionaryEntry>> GetUserDictionaryAsync(
         CancellationToken cancellationToken)
     {
-        try
+        const string operation = "GetUserDictionary";
+        const string path = "/user_dict";
+        LogVoicevoxRequest(operation, HttpMethod.Get, path);
+
+        var response = await _httpClient.GetAsync(path, cancellationToken);
+        var body = await ReadAndLogResponseAsync(operation, response, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
         {
-            var response = await _httpClient.GetFromJsonAsync<Dictionary<string, VoicevoxDictionaryEntry>>(
-                "/user_dict",
-                cancellationToken);
-            return response ?? new Dictionary<string, VoicevoxDictionaryEntry>();
+            throw new VoicevoxApiException(
+                "ユーザー辞書の取得に失敗しました。",
+                new HttpRequestException($"VOICEVOX {(int)response.StatusCode}: {Summarize(body, 512)}"));
         }
-        catch (TaskCanceledException ex)
-        {
-            _logger.LogError("Get user dictionary timeout: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIのタイムアウトが発生しました。", ex);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError("Get user dictionary connection failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIへの接続に失敗しました。", ex);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Get user dictionary failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("ユーザー辞書の取得に失敗しました。", ex);
-        }
+
+        var dictionary = JsonSerializer.Deserialize<Dictionary<string, VoicevoxDictionaryEntry>>(body, _jsonOptions);
+        return dictionary ?? new Dictionary<string, VoicevoxDictionaryEntry>();
     }
 
     public async Task<string> CreateWordAsync(VoicevoxDictionaryEntry entry, CancellationToken cancellationToken)
     {
-        try
+        const string operation = "CreateWord";
+        const string path = "/user_dict_word";
+        LogVoicevoxRequest(operation, HttpMethod.Post, path, FormatEntry(entry));
+
+        var response = await _httpClient.PostAsJsonAsync(path, entry, cancellationToken);
+        var body = await ReadAndLogResponseAsync(operation, response, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
         {
-            var response = await _httpClient.PostAsJsonAsync("/user_dict_word", entry, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
-            return doc.RootElement.GetProperty("uuid").GetString() ?? string.Empty;
+            throw new VoicevoxApiException(
+                "辞書登録に失敗しました。",
+                new HttpRequestException($"VOICEVOX {(int)response.StatusCode}: {Summarize(body, 512)}"));
         }
-        catch (TaskCanceledException ex)
-        {
-            _logger.LogError("Create word timeout: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIのタイムアウトが発生しました。", ex);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError("Create word connection failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIへの接続に失敗しました。", ex);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Create word failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("辞書登録に失敗しました。", ex);
-        }
+
+        var doc = JsonDocument.Parse(body);
+        return doc.RootElement.GetProperty("uuid").GetString() ?? string.Empty;
     }
 
     public async Task UpdateWordAsync(string uuid, VoicevoxDictionaryEntry entry, CancellationToken cancellationToken)
     {
-        try
+        const string operation = "UpdateWord";
+        var path = $"/user_dict_word/{uuid}";
+        LogVoicevoxRequest(operation, HttpMethod.Put, path, FormatEntry(entry));
+
+        var response = await _httpClient.PutAsJsonAsync(path, entry, cancellationToken);
+        var body = await ReadAndLogResponseAsync(operation, response, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
         {
-            var response = await _httpClient.PutAsJsonAsync($"/user_dict_word/{uuid}", entry, cancellationToken);
-            response.EnsureSuccessStatusCode();
-        }
-        catch (TaskCanceledException ex)
-        {
-            _logger.LogError("Update word timeout: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIのタイムアウトが発生しました。", ex);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError("Update word connection failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIへの接続に失敗しました。", ex);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Update word failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("辞書更新に失敗しました。", ex);
+            throw new VoicevoxApiException(
+                "辞書更新に失敗しました。",
+                new HttpRequestException($"VOICEVOX {(int)response.StatusCode}: {Summarize(body, 512)}"));
         }
     }
 
     public async Task DeleteWordAsync(string uuid, CancellationToken cancellationToken)
     {
-        try
+        const string operation = "DeleteWord";
+        var path = $"/user_dict_word/{uuid}";
+        LogVoicevoxRequest(operation, HttpMethod.Delete, path, $"uuid={uuid}");
+
+        var response = await _httpClient.DeleteAsync(path, cancellationToken);
+        var body = await ReadAndLogResponseAsync(operation, response, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
         {
-            var response = await _httpClient.DeleteAsync($"/user_dict_word/{uuid}", cancellationToken);
-            response.EnsureSuccessStatusCode();
+            throw new VoicevoxApiException(
+                "辞書削除に失敗しました。",
+                new HttpRequestException($"VOICEVOX {(int)response.StatusCode}: {Summarize(body, 512)}"));
         }
-        catch (TaskCanceledException ex)
+    }
+
+    private void LogVoicevoxRequest(string operation, HttpMethod method, string path, string? detail = null)
+    {
+        if (string.IsNullOrEmpty(detail))
         {
-            _logger.LogError("Delete word timeout: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIのタイムアウトが発生しました。", ex);
+            _logger.LogInformation("{Operation} request {Method} {Path}", operation, method.Method, path);
         }
-        catch (HttpRequestException ex)
+        else
         {
-            _logger.LogError("Delete word connection failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("VOICEVOX APIへの接続に失敗しました。", ex);
+            _logger.LogInformation("{Operation} request {Method} {Path} detail {Detail}", operation, method.Method, path, detail);
         }
-        catch (Exception ex)
+    }
+
+    private string FormatEntry(VoicevoxDictionaryEntry entry)
+    {
+        return $"surface={entry.Surface}, pronunciation={entry.Pronunciation}, accentType={entry.AccentType}";
+    }
+
+    private static string Summarize(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
         {
-            _logger.LogError("Delete word failed: {Exception}", ex.ToString());
-            throw new VoicevoxApiException("辞書削除に失敗しました。", ex);
+            return string.Empty;
         }
+
+        if (value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value[..maxLength] + "...";
+    }
+
+    private async Task<string> ReadAndLogResponseAsync(string operation, HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        var snippet = Summarize(body);
+        var method = response.RequestMessage?.Method?.Method ?? "UNKNOWN";
+        var uri = response.RequestMessage?.RequestUri?.ToString() ?? "UNKNOWN";
+        if (response.IsSuccessStatusCode)
+        {
+            _logger.LogInformation(
+                "{Operation} {Method} {Uri} response {StatusCode} body {Body}",
+                operation,
+                method,
+                uri,
+                (int)response.StatusCode,
+                snippet);
+        }
+        else
+        {
+            _logger.LogError(
+                "{Operation} {Method} {Uri} response {StatusCode} body {Body}",
+                operation,
+                method,
+                uri,
+                (int)response.StatusCode,
+                snippet);
+        }
+
+        return body;
     }
 }

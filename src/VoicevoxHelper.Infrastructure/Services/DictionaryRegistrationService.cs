@@ -35,6 +35,7 @@ public sealed class DictionaryRegistrationService : IDictionaryRegistrationServi
         var success = 0;
 
         var existing = await _client.GetUserDictionaryAsync(cancellationToken);
+        _logger.LogInformation("Existing dictionary contains {ExistingCount} entries", existing.Count);
         var surfaceToUuid = existing.ToDictionary(pair => pair.Value.Surface, pair => pair.Key, StringComparer.OrdinalIgnoreCase);
 
         foreach (var candidate in candidates)
@@ -46,29 +47,38 @@ public sealed class DictionaryRegistrationService : IDictionaryRegistrationServi
                 AccentType = candidate.AccentType
             };
 
+            _logger.LogInformation(
+                "Processing candidate {Surface} pron={Pronunciation} accent={AccentType}",
+                candidate.Surface,
+                candidate.Pronunciation,
+                candidate.AccentType);
+
             try
             {
                 if (surfaceToUuid.TryGetValue(candidate.Surface, out var uuid))
                 {
                     if (_settings.UpdateExistingWords)
                     {
+                        _logger.LogInformation("Updating existing word {Surface} (uuid={Uuid})", candidate.Surface, uuid);
                         await _client.UpdateWordAsync(uuid, entry, cancellationToken);
                         success++;
                     }
                     else
                     {
+                        _logger.LogInformation("Skipping existing word {Surface} because updates are disabled", candidate.Surface);
                         continue;
                     }
                 }
                 else
                 {
+                    _logger.LogInformation("Creating new word for {Surface}", candidate.Surface);
                     await _client.CreateWordAsync(entry, cancellationToken);
                     success++;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError("Dictionary registration failed: {Exception}", ex.ToString());
+                _logger.LogError(ex, "Dictionary registration failed for {Surface}", candidate.Surface);
                 failures.Add($"{candidate.Surface}: {ex.Message}");
             }
         }

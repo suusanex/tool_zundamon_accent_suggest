@@ -56,11 +56,13 @@ public sealed partial class DictionaryExtractionOutputViewModel : ViewModelBase
             var extension = OutputFormat.Equals("JSON", StringComparison.OrdinalIgnoreCase) ? "json" : "csv";
             var defaultName = $"dictionary_{DateTime.Now:yyyy-MM-dd_HHmmss}.{extension}";
             var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), defaultName);
+            _logger.LogInformation("Saving {Format} output to {Path}", OutputFormat, path);
             File.WriteAllText(path, OutputText);
+            _logger.LogInformation("Dictionary output saved to {Path}", path);
         }
         catch (Exception ex)
         {
-            _logger.LogError("Save failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Save failed for output format {Format}", OutputFormat);
             ErrorMessage = "ファイル保存に失敗しました。";
         }
     }

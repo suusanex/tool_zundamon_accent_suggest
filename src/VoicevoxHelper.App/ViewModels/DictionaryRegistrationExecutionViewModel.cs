@@ -45,16 +45,18 @@ public sealed partial class DictionaryRegistrationExecutionViewModel : ViewModel
         IsBusy = true;
         try
         {
+            _logger.LogInformation("Starting registration for {CandidateCount} candidates", _state.DictionaryCandidates.Count);
             var report = await _service.RegisterAsync(_state.DictionaryCandidates, CancellationToken.None);
             SuccessCount = report.SuccessCount;
             FailureCount = report.FailureCount;
             ResultMessage = report.Status == ExecutionStatus.Success
                 ? "登録が完了しました。"
                 : "一部の登録に失敗しました。";
+            _logger.LogInformation("Registration report status={Status} succeeded={Success} failed={Failure}", report.Status, report.SuccessCount, report.FailureCount);
         }
         catch (Exception ex)
         {
-            _logger.LogError("Registration failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Registration failed after processing {CandidateCount} candidates", _state.DictionaryCandidates.Count);
             ErrorMessage = "辞書登録に失敗しました。";
         }
         finally

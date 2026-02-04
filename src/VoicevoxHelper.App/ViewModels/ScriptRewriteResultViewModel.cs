@@ -38,11 +38,13 @@ public sealed partial class ScriptRewriteResultViewModel : ViewModelBase
     {
         try
         {
+            _logger.LogInformation("Copying rewrite result of length {Length}", RewriteResult.Length);
             _clipboardService.SetText(RewriteResult);
+            _logger.LogInformation("Rewrite result copied to clipboard");
         }
         catch (Exception ex)
         {
-            _logger.LogError("Copy failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "Copy failed for rewrite result");
             ErrorMessage = "コピーに失敗しました。";
         }
     }

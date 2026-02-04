@@ -5,6 +5,8 @@ namespace VoicevoxHelper.Core.Exceptions;
 /// </summary>
 public sealed class LlmResponseParseException : Exception
 {
+    public string? RawResponse { get; }
+
     public LlmResponseParseException(string message)
         : base(message)
     {
@@ -13,5 +15,11 @@ public sealed class LlmResponseParseException : Exception
     public LlmResponseParseException(string message, Exception innerException)
         : base(message, innerException)
     {
+    }
+
+    public LlmResponseParseException(string message, string rawResponse, Exception innerException)
+        : base(message, innerException)
+    {
+        RawResponse = rawResponse;
     }
 }

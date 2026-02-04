@@ -39,37 +39,48 @@ public sealed class AzureOpenAIService : ILlmService
         Script script,
         CancellationToken cancellationToken)
     {
+        const string context = "DictionaryExtraction";
+        var userPrompt = PromptTemplates.DictionaryExtractionUser + "\n" + script.Text;
+        LogLlmRequest(context, userPrompt, script.Text);
+
         try
         {
             var result = await _chatClient.GetChatCompletionAsync(
                 PromptTemplates.DictionaryExtractionSystem,
-                PromptTemplates.DictionaryExtractionUser + "\n" + script.Text,
+                userPrompt,
                 cancellationToken);
-            LogTokenUsage(result);
-            var candidates = ParseCandidates(result.Content);
+            LogTokenUsage(result, context);
+            LogLlmResponse(context, result);
+            var candidates = ParseCandidates(result.Content, context);
+            _logger.LogInformation("LLM {Context} returned {Count} candidates", context, candidates.Count);
             return Deduplicate(candidates);
         }
         catch (Exception ex)
         {
-            _logger.LogError("LLM extraction failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "LLM extraction failed for {Context}; script snippet: {Snippet}", context, Summarize(script.Text));
             throw;
         }
     }
 
     public async Task<string> RewriteScriptAsync(Script script, CancellationToken cancellationToken)
     {
+        const string context = "ScriptRewrite";
+        var rewritePrompt = PromptTemplates.ScriptRewriteUser + "\n" + script.Text;
+        LogLlmRequest(context, rewritePrompt, script.Text);
+
         try
         {
             var result = await _chatClient.GetChatCompletionAsync(
                 PromptTemplates.ScriptRewriteSystem,
-                PromptTemplates.ScriptRewriteUser + "\n" + script.Text,
+                rewritePrompt,
                 cancellationToken);
-            LogTokenUsage(result);
+            LogTokenUsage(result, context);
+            LogLlmResponse(context, result);
             return result.Content;
         }
         catch (Exception ex)
         {
-            _logger.LogError("LLM rewrite failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "LLM rewrite failed for {Context}; script snippet: {Snippet}", context, Summarize(script.Text));
             throw;
         }
     }
@@ -90,7 +101,7 @@ public sealed class AzureOpenAIService : ILlmService
         return result;
     }
 
-    private static IReadOnlyList<DictionaryCandidate> ParseCandidates(string json)
+    private IReadOnlyList<DictionaryCandidate> ParseCandidates(string json, string context)
     {
         try
         {
@@ -103,20 +114,59 @@ public sealed class AzureOpenAIService : ILlmService
         }
         catch (Exception ex)
         {
-            throw new LlmResponseParseException("LLMのレスポンス解析に失敗しました。", ex);
+            _logger.LogError(ex, "LLM parsing failed for {Context}; raw response snippet: {Raw}", context, Summarize(json, 400));
+            throw new LlmResponseParseException("LLMのレスポンス解析に失敗しました。", json, ex);
         }
     }
 
-    private void LogTokenUsage(ChatCompletionResult result)
+    private void LogTokenUsage(ChatCompletionResult result, string context)
     {
         var promptCost = (result.PromptTokens / 1000m) * _settings.PromptCostPer1kTokens;
         var completionCost = (result.CompletionTokens / 1000m) * _settings.CompletionCostPer1kTokens;
         var totalCost = promptCost + completionCost;
         _logger.LogInformation(
-            "TokenUsage prompt={Prompt} completion={Completion} total={Total} cost={Cost}",
+            "LLM {Context} token usage prompt={Prompt} completion={Completion} total={Total} cost={Cost}",
+            context,
             result.PromptTokens,
             result.CompletionTokens,
             result.TotalTokens,
             totalCost);
+    }
+
+    private void LogLlmRequest(string context, string prompt, string scriptText)
+    {
+        _logger.LogInformation(
+            "LLM {Context} request start length={Length} preview={Preview}",
+            context,
+            prompt.Length,
+            Summarize(prompt));
+        _logger.LogDebug("LLM {Context} script snippet={Snippet}", context, Summarize(scriptText, 200));
+    }
+
+    private void LogLlmResponse(string context, ChatCompletionResult result)
+    {
+        _logger.LogInformation(
+            "LLM {Context} response tokens prompt={PromptTokens} completion={CompletionTokens} total={TotalTokens} length={Length} preview={Preview}",
+            context,
+            result.PromptTokens,
+            result.CompletionTokens,
+            result.TotalTokens,
+            result.Content.Length,
+            Summarize(result.Content));
+    }
+
+    private static string Summarize(string text, int maxLength = 256)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        if (text.Length <= maxLength)
+        {
+            return text;
+        }
+
+        return text[..maxLength] + "...";
     }
 }

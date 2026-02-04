@@ -46,20 +46,24 @@ public sealed partial class DictionaryRegistrationFileSelectionViewModel : ViewM
         ErrorMessage = string.Empty;
         if (string.IsNullOrWhiteSpace(FilePath) || !File.Exists(FilePath))
         {
+            _logger.LogWarning("Dictionary file not found: {FilePath}", FilePath);
             ErrorMessage = "ファイルが見つかりません。";
             return;
         }
 
         try
         {
+            _logger.LogInformation("Loading dictionary file {FilePath}", FilePath);
             var text = File.ReadAllText(FilePath);
             IReadOnlyList<DictionaryCandidate> candidates;
             if (Path.GetExtension(FilePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
             {
+                _logger.LogInformation("Parsing JSON dictionary file {FilePath}", FilePath);
                 candidates = _jsonParser.Read(text);
             }
             else
             {
+                _logger.LogInformation("Parsing CSV dictionary file {FilePath}", FilePath);
                 candidates = _csvParser.Read(text);
             }
 
@@ -81,11 +85,12 @@ public sealed partial class DictionaryRegistrationFileSelectionViewModel : ViewM
 
             _state.SelectedFilePath = FilePath;
             _state.DictionaryCandidates = candidates;
+            _logger.LogInformation("Loaded {CandidateCount} candidates from {FilePath}", candidates.Count, FilePath);
             _navigationService.Navigate<DictionaryRegistrationValidationPage>();
         }
         catch (Exception ex)
         {
-            _logger.LogError("File load failed: {Exception}", ex.ToString());
+            _logger.LogError(ex, "File load failed: {FilePath}", FilePath);
             ErrorMessage = "ファイルの読み込みに失敗しました。";
         }
     }
