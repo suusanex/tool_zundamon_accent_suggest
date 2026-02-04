@@ -1,390 +1,505 @@
-# Implementation Tasks: Core Workflow
+# Tasks: 辞書候補抽出の日本語対応修正
 
-**Feature**: `001-core-workflow`  
-**Date**: 2026-01-27  
-**Status**: Ready for Implementation
+**Branch**: `001-core-workflow`  
+**Date**: 2026-02-04  
+**Related Plan**: [plan.md](plan.md) - A-1) 辞書候補抽出の品質/互換性
 
-このドキュメントは実装タスクの完全なリストを提供する。各User Storyは独立して実装・テスト可能な単位として構成されている。
+## 背景
 
----
+運用上、「辞書候補抽出で英単語（例: AI）のみが返り、日本語の候補が返らない」事象が発生した。
+原因は、プロンプト契約の曖昧さ・実装のJSON契約不一致・構造化出力未強制による不安定さが主因。
 
-## Task Format
+## 修正方針
 
-```
-- [ ] [TaskID] [P] [StoryLabel] Description with file path
-```
-
-- **TaskID**: T001, T002... （実行順序）
-- **[P]**: 並列実行可能（異なるファイル、依存なし）
-- **[StoryLabel]**: User Story識別子（[US1], [US2], [US3]）
-- **Description**: 明確なアクション + 具体的なファイルパス
-
----
-
-## Phase 1: Setup（プロジェクト初期化）
-
-**Goal**: 開発環境とプロジェクト構造を準備する。
-
-- [x] T001 ソリューションファイルを作成 (VoicevoxHelper.sln)
-- [x] T002 WPFアプリケーションプロジェクトを作成 (src/VoicevoxHelper.App)
-- [x] T003 コアライブラリプロジェクトを作成 (src/VoicevoxHelper.Core)
-- [x] T004 インフラストラクチャプロジェクトを作成 (src/VoicevoxHelper.Infrastructure)
-- [x] T005 ユニットテストプロジェクトを作成 (tests/VoicevoxHelper.Tests)
-- [x] T006 統合テストプロジェクトを作成 (tests/VoicevoxHelper.IntegrationTests)
-- [x] T007 プロジェクト参照を設定（App→Core/Infrastructure、Infrastructure→Core、Tests→Core/Infrastructure）
-- [x] T008 [P] NuGetパッケージをインストール（App: Generic Host, WPF-UI, MVVM Toolkit, Serilog）
-- [x] T009 [P] NuGetパッケージをインストール（Infrastructure: Azure.AI.OpenAI, CsvHelper）
-- [x] T010 [P] NuGetパッケージをインストール（Tests: NUnit, Moq）
-- [x] T011 appsettings.jsonを作成（src/VoicevoxHelper.App/appsettings.json）
-- [x] T012 .gitignoreを作成/更新（secrets.json, bin/, obj/, logs/ を除外）
-- [ ] T013 README.mdを作成（プロジェクト概要、ビルド手順、実行方法）
-
-**Independent Test**: ビルドが成功し、アプリケーションが起動すること。
+1. プロンプト契約の明確化（日本語固有名詞も対象であることを明示、`accent_type`に統一）
+2. 構造化出力（JSON mode）の強制
+3. レスポンス契約のパース処理（`candidates`ラッパー対応、`accent_type`に統一）
+4. Fail-fast エラーハンドリング（パース失敗時は例外投げ、フォールバックなし）
+5. テストで回帰防止（ユニット・統合テスト同梱）
+6. ログ方針の統一（内容は出さない、メトリクスのみ記録）
 
 ---
 
-## Phase 2: Foundational（共通基盤）
-
-**Goal**: 全User Storyで共有される基盤コンポーネントを実装する。
-
-### 2.1 ドメインモデル
-
-- [x] T014 [P] Enumsを定義 (src/VoicevoxHelper.Core/Models/Enums.cs: WordType, ConfidenceLevel, ExecutionMode, ExecutionStatus, MaskingType)
-- [x] T015 [P] DictionaryCandidateモデルを実装 (src/VoicevoxHelper.Core/Models/DictionaryCandidate.cs)
-- [x] T016 [P] Scriptモデルを実装 (src/VoicevoxHelper.Core/Models/Script.cs)
-- [x] T017 [P] MaskingResultモデルを実装 (src/VoicevoxHelper.Core/Models/MaskingResult.cs)
-- [x] T018 [P] ExecutionReportモデルを実装 (src/VoicevoxHelper.Core/Models/ExecutionReport.cs)
-- [x] T019 [P] ApplicationSettingsモデルを実装 (src/VoicevoxHelper.Core/Models/ApplicationSettings.cs)
-
-### 2.2 バリデーション
-
-- [x] T020 [P] DictionaryCandidateValidatorを実装 (src/VoicevoxHelper.Core/Validators/DictionaryCandidateValidator.cs)
-- [x] T021 [P] ScriptValidatorを実装 (src/VoicevoxHelper.Core/Validators/ScriptValidator.cs)
-
-### 2.3 例外
-
-- [x] T022 [P] カスタム例外クラスを実装 (src/VoicevoxHelper.Core/Exceptions/: LlmResponseParseException, ScriptTooLongException, VoicevoxApiException)
-
-### 2.4 Generic Host & 設定
-
-- [x] T023 App.xaml.csでGeneric Host構成を実装 (src/VoicevoxHelper.App/App.xaml.cs)
-- [x] T024 appsettings.jsonとsecrets.jsonの読み込みロジックを実装 (App.xaml.cs内)
-- [x] T025 Serilogの設定を追加（Console + File出力）(App.xaml.cs内)
-- [x] T026 DI登録のベースを実装（ViewModels, Services, Clients）(App.xaml.cs内)
-
-### 2.5 ナビゲーション
-
-- [x] T027 NavigationServiceインターフェースを定義 (src/VoicevoxHelper.Core/Interfaces/INavigationService.cs)
-- [x] T028 NavigationServiceを実装 (src/VoicevoxHelper.App/Services/NavigationService.cs)
-- [x] T029 MainWindow.xamlにFrameコントロールを追加 (src/VoicevoxHelper.App/Views/MainWindow.xaml)
-
-### 2.6 UI共通コンポーネント
-
-- [x] T030 [P] エラー表示用UserControlを作成 (src/VoicevoxHelper.App/Views/Controls/ErrorDisplay.xaml)
-- [x] T031 [P] 進捗表示用UserControlを作成 (src/VoicevoxHelper.App/Views/Controls/ProgressDisplay.xaml)
-
-**Independent Test**: 
-- 全モデルクラスのUnit Test（バリデーション含む）
-- Generic Hostが正常に起動し、DIコンテナが動作すること
-- NavigationServiceでページ遷移ができること
-
----
-
-## Phase 3: User Story 1 - 台本から辞書候補を抽出して編集 (P1)
-
-**Goal**: 台本テキストを入力し、LLMで辞書候補を抽出し、CSV/JSONファイルとして出力する。
-
-**Independent Test**: 台本を入力し、辞書候補ファイルが出力されること。ファイルを外部エディタで編集可能であること。
-
-### 3.1 個人情報マスキング
-
-- [x] T032 IMaskingServiceインターフェースを定義 (src/VoicevoxHelper.Core/Interfaces/IMaskingService.cs)
-- [x] T033 PersonalInfoMaskingServiceを実装 (src/VoicevoxHelper.Infrastructure/Masking/PersonalInfoMaskingService.cs: 正規表現ベースのマスキング)
-- [x] T034 PersonalInfoMaskingServiceのUnit Testを作成 (tests/VoicevoxHelper.Tests/Infrastructure/Masking/PersonalInfoMaskingServiceTests.cs)
-
-### 3.2 Azure OpenAI統合（辞書抽出）
-
-- [x] T035 ILlmServiceインターフェースを定義 (src/VoicevoxHelper.Core/Interfaces/ILlmService.cs)
-- [x] T036 PromptTemplatesクラスを実装（辞書抽出用プロンプト）(src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs)
-- [x] T037 AzureOpenAIServiceを実装（辞書抽出機能）(src/VoicevoxHelper.Infrastructure/LlmService/AzureOpenAIService.cs)
-- [x] T038 AzureOpenAIServiceのUnit Testを作成（Mockレスポンス）(tests/VoicevoxHelper.Tests/Infrastructure/LlmService/AzureOpenAIServiceTests.cs)
-
-### 3.3 ファイルI/O（CSV/JSON）
-
-- [x] T039 ICsvParserインターフェースを定義 (src/VoicevoxHelper.Core/Interfaces/ICsvParser.cs)
-- [x] T040 IJsonParserインターフェースを定義 (src/VoicevoxHelper.Core/Interfaces/IJsonParser.cs)
-- [x] T041 CsvDictionaryParserを実装 (src/VoicevoxHelper.Infrastructure/FileIO/CsvDictionaryParser.cs)
-- [x] T042 JsonDictionaryParserを実装 (src/VoicevoxHelper.Infrastructure/FileIO/JsonDictionaryParser.cs)
-- [x] T043 [P] CsvDictionaryParserのUnit Testを作成 (tests/VoicevoxHelper.Tests/Infrastructure/FileIO/CsvDictionaryParserTests.cs)
-- [x] T044 [P] JsonDictionaryParserのUnit Testを作成 (tests/VoicevoxHelper.Tests/Infrastructure/FileIO/JsonDictionaryParserTests.cs)
-
-### 3.4 UI実装（辞書抽出ウィザード）
-
-- [x] T045 [US1] ModeSelectionPage.xamlを作成（モード選択画面）(src/VoicevoxHelper.App/Views/ModeSelectionPage.xaml)
-- [x] T046 [US1] ModeSelectionViewModelを実装 (src/VoicevoxHelper.App/ViewModels/ModeSelectionViewModel.cs)
-- [x] T047 [US1] DictionaryExtraction/InputPage.xamlを作成 (src/VoicevoxHelper.App/Views/DictionaryExtraction/InputPage.xaml)
-- [x] T048 [US1] DictionaryExtraction/InputViewModelを実装 (src/VoicevoxHelper.App/ViewModels/DictionaryExtraction/InputViewModel.cs)
-- [x] T049 [US1] DictionaryExtraction/PreviewPage.xamlを作成 (src/VoicevoxHelper.App/Views/DictionaryExtraction/PreviewPage.xaml)
-- [x] T050 [US1] DictionaryExtraction/PreviewViewModelを実装 (src/VoicevoxHelper.App/ViewModels/DictionaryExtraction/PreviewViewModel.cs)
-- [x] T051 [US1] DictionaryExtraction/OutputPage.xamlを作成 (src/VoicevoxHelper.App/Views/DictionaryExtraction/OutputPage.xaml)
-- [x] T052 [US1] DictionaryExtraction/OutputViewModelを実装 (src/VoicevoxHelper.App/ViewModels/DictionaryExtraction/OutputViewModel.cs)
-
-### 3.5 統合・テスト
-
-- [x] T053 [US1] DI登録を追加（IMaskingService, ILlmService, ICsvParser, IJsonParser）(src/VoicevoxHelper.App/App.xaml.cs)
-- [x] T054 [US1] 辞書抽出フロー全体のIntegration Testを作成（スタブ/モック使用。CIで実LLMへ接続しない）(tests/VoicevoxHelper.IntegrationTests/DictionaryExtractionFlowTests.cs)
-- [ ] T055 [US1] 手動テスト：台本入力→抽出→ファイル出力→外部エディタで確認
-
-**Acceptance Criteria**:
-- ✅ 台本テキストを入力し、辞書候補が抽出される
-- ✅ CSV/JSON形式でファイル保存が可能
-- ✅ 外部エディタ（Excel等）で編集可能
-- ✅ LLM処理失敗時にエラーメッセージが表示される
-
----
-
-## Phase 4: User Story 2 - 辞書候補をVOICEVOX APIに一括登録 (P2)
-
-**Goal**: 編集済み辞書候補ファイルを読み込み、VOICEVOX APIに登録する。
-
-**Independent Test**: 辞書候補ファイル（CSV/JSON）を入力し、VOICEVOX APIへの登録が実行され、成功/失敗レポートが表示されること。
-
-### 4.1 VOICEVOX API統合
-
-- [x] T056 IVoicevoxApiClientインターフェースを定義 (src/VoicevoxHelper.Core/Interfaces/IVoicevoxApiClient.cs)
-- [x] T057 VoicevoxDictionaryEntry DTOを作成 (src/VoicevoxHelper.Infrastructure/VoicevoxApi/Models/VoicevoxDictionaryEntry.cs)
-- [x] T058 VoicevoxApiClientを実装（GET /user_dict）(src/VoicevoxHelper.Infrastructure/VoicevoxApi/VoicevoxApiClient.cs)
-- [x] T059 VoicevoxApiClientを実装（POST /user_dict_word）(src/VoicevoxHelper.Infrastructure/VoicevoxApi/VoicevoxApiClient.cs)
-- [x] T060 VoicevoxApiClientを実装（PUT /user_dict_word/{uuid}）(src/VoicevoxHelper.Infrastructure/VoicevoxApi/VoicevoxApiClient.cs)
-- [x] T061 VoicevoxApiClientを実装（DELETE /user_dict_word/{uuid}）(src/VoicevoxHelper.Infrastructure/VoicevoxApi/VoicevoxApiClient.cs)
-- [x] T062 [P] VoicevoxApiClientのUnit Testを作成（Mockレスポンス）(tests/VoicevoxHelper.Tests/Infrastructure/VoicevoxApi/VoicevoxApiClientTests.cs)
-
-### 4.2 辞書登録サービス
-
-- [x] T063 [US2] IDictionaryRegistrationServiceインターフェースを定義 (src/VoicevoxHelper.Core/Interfaces/IDictionaryRegistrationService.cs)
-- [x] T064 [US2] DictionaryRegistrationServiceを実装（冪等性チェック、部分成功対応）(src/VoicevoxHelper.Infrastructure/Services/DictionaryRegistrationService.cs)
-- [x] T065 [US2] DictionaryRegistrationServiceのUnit Testを作成 (tests/VoicevoxHelper.Tests/Infrastructure/Services/DictionaryRegistrationServiceTests.cs)
-
-### 4.3 UI実装（辞書登録ウィザード）
-
-- [x] T066 [US2] DictionaryRegistration/FileSelectionPage.xamlを作成 (src/VoicevoxHelper.App/Views/DictionaryRegistration/FileSelectionPage.xaml)
-- [x] T067 [US2] DictionaryRegistration/FileSelectionViewModelを実装 (src/VoicevoxHelper.App/ViewModels/DictionaryRegistration/FileSelectionViewModel.cs)
-- [x] T068 [US2] DictionaryRegistration/ValidationPage.xamlを作成 (src/VoicevoxHelper.App/Views/DictionaryRegistration/ValidationPage.xaml)
-- [x] T069 [US2] DictionaryRegistration/ValidationViewModelを実装 (src/VoicevoxHelper.App/ViewModels/DictionaryRegistration/ValidationViewModel.cs)
-- [x] T070 [US2] DictionaryRegistration/RegistrationPage.xamlを作成（進捗表示、結果レポート）(src/VoicevoxHelper.App/Views/DictionaryRegistration/RegistrationPage.xaml)
-- [x] T071 [US2] DictionaryRegistration/RegistrationViewModelを実装 (src/VoicevoxHelper.App/ViewModels/DictionaryRegistration/RegistrationViewModel.cs)
-
-### 4.4 統合・テスト
-
-- [x] T072 [US2] DI登録を追加（IVoicevoxApiClient, IDictionaryRegistrationService）(src/VoicevoxHelper.App/App.xaml.cs)
-- [x] T073 [US2] HttpClientのタイムアウト設定と例外ハンドリングを設定（原則リトライしない）(src/VoicevoxHelper.App/App.xaml.cs)
-- [x] T074 [US2] 辞書登録フロー全体のIntegration Testを作成（スタブ/モック使用。CIで実VOICEVOXへ接続しない）(tests/VoicevoxHelper.IntegrationTests/DictionaryRegistrationFlowTests.cs)
-- [ ] T075 [US2] 手動テスト：CSVファイル選択→バリデーション→登録実行→結果確認
-
-**Acceptance Criteria**:
-- ✅ CSV/JSONファイルを選択し、内容が検証される
-- ✅ VOICEVOX APIに順次登録され、進捗が表示される
-- ✅ 成功件数・失敗件数・失敗詳細がレポート表示される
-- ✅ API認証エラー時に適切なエラーメッセージが表示される
-- ✅ 既存単語の更新/スキップが設定に従って動作する
-
----
-
-## Phase 5: User Story 3 - 台本を喋りやすく自動リライト (P3)
-
-**Goal**: 台本テキストを入力し、LLMでリライトし、結果をコピー可能な形で表示する。
-
-**Independent Test**: 台本を入力し、リライト結果が表示され、クリップボードにコピー可能であること。
-
-### 5.1 Azure OpenAI統合（リライト）
-
-- [x] T076 PromptTemplatesクラスにリライト用プロンプトを追加 (src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs)
-- [x] T077 [US3] AzureOpenAIServiceにリライト機能を実装 (src/VoicevoxHelper.Infrastructure/LlmService/AzureOpenAIService.cs)
-- [x] T078 [US3] リライト機能のUnit Testを作成 (tests/VoicevoxHelper.Tests/Infrastructure/LlmService/AzureOpenAIServiceRewriteTests.cs)
-
-### 5.2 UI実装（リライトウィザード）
-
-- [x] T079 [US3] ScriptRewrite/InputPage.xamlを作成 (src/VoicevoxHelper.App/Views/ScriptRewrite/InputPage.xaml)
-- [x] T080 [US3] ScriptRewrite/InputViewModelを実装 (src/VoicevoxHelper.App/ViewModels/ScriptRewrite/InputViewModel.cs)
-- [x] T081 [US3] ScriptRewrite/ResultPage.xamlを作成（元の台本とリライト結果を並べて表示）(src/VoicevoxHelper.App/Views/ScriptRewrite/ResultPage.xaml)
-- [x] T082 [US3] ScriptRewrite/ResultViewModelを実装（クリップボードコピー機能）(src/VoicevoxHelper.App/ViewModels/ScriptRewrite/ResultViewModel.cs)
-
-### 5.3 統合・テスト
-
-- [x] T083 [US3] DI登録を確認（ILlmServiceは既に登録済み）
-- [x] T084 [US3] リライトフロー全体のIntegration Testを作成（スタブ/モック使用。CIで実LLMへ接続しない）(tests/VoicevoxHelper.IntegrationTests/ScriptRewriteFlowTests.cs)
-- [ ] T085 [US3] 手動テスト：台本入力→リライト実行→結果表示→コピー
-
-**Acceptance Criteria**:
-- ✅ 台本テキストを入力し、リライトが実行される
-- ✅ 元の台本とリライト結果が並べて表示される
-- ✅ リライト結果をワンクリックでコピー可能
-- ✅ LLM処理失敗時にエラーメッセージが表示され、元の台本が保持される
-
----
-
-## Phase 6: Polish & Cross-Cutting Concerns
-
-**Goal**: 全体の品質向上、エラーハンドリング強化、ログ改善、ドキュメント整備。
-
-### 6.1 エラーハンドリング強化
-
-- [x] T086 [P] 全ViewModelに共通エラーハンドリングを実装（try-catch + ログ出力）
-- [x] T087 [P] タイムアウト/接続エラー時のユーザー向けメッセージを改善
-- [x] T088 [P] バリデーションエラー時の具体的な箇所表示（行番号、カラム名）
-
-### 6.2 ログ改善
-
-- [x] T089 [P] トークン使用量の詳細ログを追加（プロンプト/完了トークン、推定コスト）
-- [x] T090 [P] 機密情報（台本本文、APIキー）がログに出力されていないことを確認
-- [x] T091 [P] ExecutionReportをJSON形式でログファイルにエクスポート
-
-### 6.3 パフォーマンス最適化
-
-- [x] T092 [P] 重複単語の排除ロジックを最適化（HashSet使用）
-- [x] T093 [P] CSV/JSONパース時の大量データ対応（ストリーム処理）
-
-### 6.4 UI/UX改善
-
-- [x] T094 [P] WPF-UIテーマの適用確認（Fluent Design）
-- [x] T095 [P] 全画面で一貫したエラー表示スタイルを適用
-- [x] T096 [P] 進捗表示のアニメーション改善（ProgressRing使用）
-- [x] T097 [P] ファイル保存時のデフォルトファイル名を自動生成（例: dictionary_2026-01-27_123456.csv）
-
-### 6.5 テストカバレッジ向上
-
-- [x] T098 [P] Core層のUnit Testカバレッジを80%以上にする
-- [x] T099 [P] Infrastructure層のUnit Testカバレッジを70%以上にする
-- [x] T100 [P] Integration Testを全User Storyで実行し、成功することを確認
-
-### 6.6 ドキュメント整備
-
-- [x] T101 [P] USER_GUIDE.mdを作成（ユーザー向け使用方法）
-- [x] T102 [P] DEVELOPER_GUIDE.mdを作成（開発者向けセットアップ・ビルド手順）
-- [x] T103 [P] API_REFERENCE.mdを作成（主要インターフェース・クラスのリファレンス）
-- [x] T104 [P] README.mdを更新（badges、スクリーンショット、機能概要）
-
-### 6.7 CI/CD
-
-- [x] T105 [P] GitHub Actions workflowを作成（ビルド・テスト自動実行）(.github/workflows/ci.yml)
-- [x] T106 [P] Coverlet + Coveralls統合（テストカバレッジレポート）
-
----
-
-## Additions (Policy Alignment)
-
-- [x] T107 [P] FR-021 台本上限超過時の「分割方法」ガイダンス文言を確定し、ScriptValidatorのエラーメッセージに含める (src/VoicevoxHelper.Core/Validators/ScriptValidator.cs)
-- [x] T108 [P] T107のUnit Testを追加（ガイダンス文言を含むことを検証）(tests/VoicevoxHelper.Tests/Core/Validators/ScriptValidatorTests.cs)
-- [x] T109 [P] FR-024 PromptTemplatesに「辞書候補抽出のみ」等の制約文を必須化し、Unit Testで固定文言の存在を検証 (src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs, tests/VoicevoxHelper.Tests/Infrastructure/LlmService/PromptTemplatesTests.cs)
-- [x] T110 [P] Success Criteriaの手動検証手順（時間/コスト/再現率の計測）をチェックリスト化 (specs/001-core-workflow/checklists/verification.md)
-
-**Independent Test**: 
-- 全User StoriesのAcceptance Scenariosが成功すること
-- テストカバレッジが目標値を達成すること
-- CI/CDパイプラインが正常に動作すること
-
----
-
-## Dependencies（ストーリー完了順序）
-
-```
-Phase 1: Setup
-  ↓
-Phase 2: Foundational (全User Storyの前提)
-  ↓
-Phase 3: US1 (辞書抽出) ←┐
-  ↓                      │  並行実装可能
-Phase 4: US2 (API登録) ←┤  （US1の出力ファイルを使用）
-  ↓                      │
-Phase 5: US3 (リライト) ←┘  （独立、辞書不要）
-  ↓
-Phase 6: Polish
+## Phase 1: プロンプト契約の明確化
+
+### Task 1.1: プロンプトテンプレート修正
+
+**File**: [src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs](../../../src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs)
+
+**目的**: 辞書抽出プロンプトを [contracts/azure-openai-prompts.md](contracts/azure-openai-prompts.md) の仕様に合わせて改善する。
+
+**修正内容**:
+- `DictionaryExtractionSystem` プロンプトを詳細化：
+  - 日本語固有名詞（東京、VOICEVOX等）も抽出対象であることを明示
+  - アクセント核位置の説明を追加（0=平板型、1以上=下がり目位置）
+  - 日本語例を追加（東京→トウキョウ、accent_type=0 等）
+  - 出力は **JSON形式のみ** であることを強調
+  
+- `DictionaryExtractionUser` プロンプトを簡潔化：
+  - "固有名詞・専門用語・特殊読みが必要な単語" → "音声合成用の辞書登録が必要な単語" に変更
+  - JSONスキーマの指示を System プロンプトに移動
+
+- **JSON出力キーの統一**:
+  - プロンプトで要求するキー名を `accent_type`（snake_case）に統一
+  - 実装コード（DTOとテスト）にも `accent_type` で統一し、互換対応は廃止
+
+**期待される出力例**:
+```json
+{
+  "candidates": [
+    {
+      "surface": "東京",
+      "pronunciation": "トウキョウ",
+      "accent_type": 0,
+      "confidence": "high",
+      "note": "地名、平板型"
+    }
+  ]
+}
 ```
 
-- **US1 → US2**: US2はUS1の出力ファイル（CSV/JSON）を入力とするため、US1完了後にテスト可能
-- **US1 ⊥ US3**: US3はUS1と独立（辞書候補を使用しない）ため、並行実装可能
-- **US2 ⊥ US3**: US2とUS3は独立のため、並行実装可能
+**テスト同梱**:
+- PromptTemplates.cs のクラス仕様テスト（プロンプト文に日本語例とaccent_typeキーが含まれることを確認）
+- 手動確認：辞書抽出実行で日本語固有名詞が候補に含まれることを確認
 
 ---
 
-## Parallel Execution Examples（並行実装の例）
+## Phase 2: JSON構造化出力の強制
 
-### Phase 2: Foundational（最大並行度: 3）
+### Task 2.1: OpenAiChatClient に response_format 追加
 
-```
-Developer 1: ドメインモデル（T014-T019）
-Developer 2: バリデーション・例外（T020-T022）
-Developer 3: Generic Host設定・ナビゲーション（T023-T029）
-```
+**File**: [src/VoicevoxHelper.Infrastructure/LlmService/OpenAiChatClient.cs](../../../src/VoicevoxHelper.Infrastructure/LlmService/OpenAiChatClient.cs)
 
-### Phase 3: US1（最大並行度: 3）
+**目的**: Azure OpenAI APIの呼び出し時に `response_format: { type: "json_object" }` を指定し、JSON以外の出力を抑止する。
 
-```
-Developer 1: マスキング（T032-T034）
-Developer 2: LLM統合（T035-T038）
-Developer 3: ファイルI/O（T039-T044）
+**修正内容**:
+1. `GetChatCompletionAsync()` メソッドの payload に `response_format` を追加：
+   ```csharp
+   var payload = new
+   {
+       messages = new[]
+       {
+           new { role = "system", content = systemPrompt },
+           new { role = "user", content = userPrompt }
+       },
+       temperature = 0,
+       response_format = new { type = "json_object" }  // 追加
+   };
+   ```
 
-→ 完了後、UI実装（T045-T052）は順次実行
-```
+2. **APIバージョン確定**：
+   - Azure OpenAI API で `response_format: { type: "json_object" }` は `2024-02-15-preview` 以降でサポート
+   - 現在の appsettings.json の `ApiVersion` が `2024-02-15-preview` 以上であることを確認
+   - サポート未確認の場合は `appsettings.json` の `ApiVersion` を `2024-08-01-preview` に更新
 
-### Phase 4-5: US2 & US3（最大並行度: 2）
+**テスト同梱**:
+- Unit Test: OpenAiChatClient の送信 payload に `response_format: { type: "json_object" }` が含まれることを Moq で検証
 
-```
-Developer 1: US2（VOICEVOX API統合 + UI）（T056-T075）
-Developer 2: US3（リライト機能 + UI）（T076-T085）
+**検証方法**:
+- 辞書抽出実行時、LLMレスポンスがコードフェンスなしの純粋なJSONになることを確認
+
+---
+
+## Phase 3: レスポンス契約の互換パース
+
+### Task 3.1: AzureOpenAIService のパース処理改善
+
+**File**: [src/VoicevoxHelper.Infrastructure/LlmService/AzureOpenAIService.cs](../../../src/VoicevoxHelper.Infrastructure/LlmService/AzureOpenAIService.cs)
+
+**目的**: 
+- `{ "candidates": [ ... ] }` 形式（契約準拠）を優先的に処理
+- 暫定互換：トップレベル配列 `[...]` も当面受け入れ（廃止予定時期：2026-Q2）
+- `accent_type`（snake_case）のみを受け入れ、`accentType` 互換は廃止
+
+**修正内容**:
+
+1. **DTO クラスの追加**（`ParseCandidates()` 内で使用）:
+   ```csharp
+   // AzureOpenAIService.cs 内にプライベートクラスとして追加
+   private sealed class ExtractionResponse
+   {
+       [JsonPropertyName("candidates")]
+       public List<CandidateDto>? Candidates { get; set; }
+   }
+   
+   private sealed class CandidateDto
+   {
+       [JsonPropertyName("surface")]
+       public string Surface { get; set; } = string.Empty;
+       
+       [JsonPropertyName("pronunciation")]
+       public string Pronunciation { get; set; } = string.Empty;
+       
+       // accent_type のみを受け入れ（snake_case）
+       [JsonPropertyName("accent_type")]
+       public int AccentType { get; set; }
+       
+       [JsonPropertyName("confidence")]
+       public string? Confidence { get; set; }
+       
+       [JsonPropertyName("note")]
+       public string? Note { get; set; }
+   }
+   ```
+
+2. **`ParseCandidates()` メソッドの書き換え**:
+   ```csharp
+   private IReadOnlyList<DictionaryCandidate> ParseCandidates(string json, string context)
+   {
+       try
+       {
+           var options = new JsonSerializerOptions
+           {
+               PropertyNameCaseInsensitive = true
+           };
+           
+           // 1. まず { "candidates": [...] } 形式を試す（契約準拠）
+           try
+           {
+               var wrapper = JsonSerializer.Deserialize<ExtractionResponse>(json, options);
+               if (wrapper?.Candidates != null && wrapper.Candidates.Count > 0)
+               {
+                   return ConvertToDictionaryCandidates(wrapper.Candidates);
+               }
+           }
+           catch (JsonException)
+           {
+               // ラッパー形式でない場合は次へ
+           }
+           
+           // 2. トップレベル配列 [...] 形式を試す（暫定互換、2026-Q2で廃止予定）
+           try
+           {
+               var items = JsonSerializer.Deserialize<List<CandidateDto>>(json, options);
+               if (items != null && items.Count > 0)
+               {
+                   _logger.LogWarning("LLM returned top-level array format; will be removed in 2026-Q2. Please use {{\"candidates\": [...] }} format.");
+                   return ConvertToDictionaryCandidates(items);
+               }
+           }
+           catch (JsonException)
+           {
+               // どちらもパース失敗 → 例外投げ
+           }
+           
+           // パース失敗（Fail-fast）
+           _logger.LogError("LLM parsing failed for {Context}. Response format does not match expected JSON structure.", context);
+           throw new LlmResponseParseException("LLMのレスポンスがJSON形式ではありません。期待される形式: { \"candidates\": [...] }", json);
+       }
+       catch (Exception ex) when (!(ex is LlmResponseParseException))
+       {
+           _logger.LogError(ex, "Unexpected error during LLM parsing for {Context}", context);
+           throw new LlmResponseParseException("LLMのレスポンス解析に失敗しました。", json, ex);
+       }
+   }
+   
+   private IReadOnlyList<DictionaryCandidate> ConvertToDictionaryCandidates(List<CandidateDto> dtos)
+   {
+       return dtos.Select(dto => new DictionaryCandidate
+       {
+           Surface = dto.Surface,
+           Pronunciation = dto.Pronunciation,
+           AccentType = dto.AccentType,
+           // 他のプロパティは既定値
+       }).ToList();
+   }
+   ```
+
+**テスト同梱**:
+- Unit Test で以下を保証：
+  - `{ "candidates": [ ... ] }`（契約準拠）正常パース
+  - トップレベル配列 `[...]` パース（互換モード、警告ログ出力）
+  - `accent_type`（snake_case）を含むJSON正常パース
+  - パース失敗時は `LlmResponseParseException` 投出（例外を吸収しない）
+  - 空の `candidates` は例外投出（Fail-fast）
+
+---
+
+## Phase 4: テストで回帰防止
+
+### Task 4.1: Unit Test 追加
+
+**File**: [tests/VoicevoxHelper.Tests/Infrastructure/LlmService/AzureOpenAIServiceTests.cs](../../../tests/VoicevoxHelper.Tests/Infrastructure/LlmService/AzureOpenAIServiceTests.cs)
+
+**目的**: 今回の修正について、以下のケースを自動テストで保証する。
+
+**追加テストケース**:
+
+1. **Test: ラッパー形式（契約準拠）がパースできる**
+   ```csharp
+   [Test]
+   public async Task ExtractDictionaryCandidatesAsync_WhenWrapperFormat_ParsesCorrectly()
+   {
+       var json = """
+       {
+         "candidates": [
+           {
+             "surface": "東京",
+             "pronunciation": "トウキョウ",
+             "accentType": 0
+           }
+         ]
+       }
+       """;
+       var service = new AzureOpenAIService(
+           new FakeChatClient(json), 
+           NullLogger<AzureOpenAIService>.Instance, 
+           new LlmSettings());
+   
+       var result = await service.ExtractDictionaryCandidatesAsync(
+           new Script { Text = "test" }, 
+           CancellationToken.None);
+   
+       Assert.That(result, Has.Count.EqualTo(1));
+       Assert.That(result[0].Surface, Is.EqualTo("東京"));
+       Assert.That(result[0].Pronunciation, Is.EqualTo("トウキョウ"));
+       Assert.That(result[0].AccentType, Is.EqualTo(0));
+   }
+   ```
+
+2. **Test: トップレベル配列（互換形式）がパースできる**
+   ```csharp
+   [Test]
+   public async Task ExtractDictionaryCandidatesAsync_WhenTopLevelArray_ParsesCorrectly()
+   {
+       var json = """
+       [
+         {
+           "surface": "VOICEVOX",
+           "pronunciation": "ボイスボックス",
+           "accentType": 3
+         }
+       ]
+       """;
+       var service = new AzureOpenAIService(
+           new FakeChatClient(json), 
+           NullLogger<AzureOpenAIService>.Instance, 
+           new LlmSettings());
+   
+       var result = await service.ExtractDictionaryCandidatesAsync(
+           new Script { Text = "test" }, 
+           CancellationToken.None);
+   
+       Assert.That(result, Has.Count.EqualTo(1));
+       Assert.That(result[0].Surface, Is.EqualTo("VOICEVOX"));
+       Assert.That(result[0].AccentType, Is.EqualTo(3));
+   }
+   ```
+
+3. **Test: 互換：トップレベル配列パース時に警告ログが出る**
+   ```csharp
+   [Test]
+   public async Task ExtractDictionaryCandidatesAsync_WhenTopLevelArray_EmitsWarningLog()
+   {
+       var json = """[
+         { "surface": "日本", "pronunciation": "ニホン", "accent_type": 1 }
+       ]""";
+       var mockLogger = new Mock<ILogger<AzureOpenAIService>>();
+       var service = new AzureOpenAIService(
+           new FakeChatClient(json), 
+           mockLogger.Object, 
+           new LlmSettings());
+   
+       var result = await service.ExtractDictionaryCandidatesAsync(
+           new Script { Text = "test" }, 
+           CancellationToken.None);
+   
+       Assert.That(result, Has.Count.EqualTo(1));
+       mockLogger.Verify(
+           x => x.Log(
+               LogLevel.Warning,
+               It.IsAny<EventId>(),
+               It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("top-level array")),
+               It.IsAny<Exception>(),
+               It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+           Times.Once);
+   }
+   ```
+
+4. **Test: パース失敗（不正フォーマット）時は例外投出**
+   ```csharp
+   [Test]
+   public void ExtractDictionaryCandidatesAsync_WhenInvalidJson_ThrowsException()
+   {
+       var invalidJson = "<not json>";
+       var service = new AzureOpenAIService(
+           new FakeChatClient(invalidJson), 
+           NullLogger<AzureOpenAIService>.Instance, 
+           new LlmSettings());
+   
+       var ex = Assert.ThrowsAsync<LlmResponseParseException>(
+           () => service.ExtractDictionaryCandidatesAsync(
+               new Script { Text = "test" }, 
+               CancellationToken.None));
+       
+       Assert.That(ex.Message, Does.Contain("JSON形式"));
+   }
+   ```
+
+5. **Test: 日本語surfaceを含む候補が欠落しない**
+   ```csharp
+   [Test]
+   public async Task ExtractDictionaryCandidatesAsync_WhenJapaneseSurface_NotDropped()
+   {
+       var json = """
+       {
+         "candidates": [
+           {
+             "surface": "東京",
+             "pronunciation": "トウキョウ",
+             "accentType": 0
+           },
+           {
+             "surface": "VOICEVOX",
+             "pronunciation": "ボイスボックス",
+             "accentType": 3
+           }
+         ]
+       }
+       """;
+       var service = new AzureOpenAIService(
+           new FakeChatClient(json), 
+           NullLogger<AzureOpenAIService>.Instance, 
+           new LlmSettings());
+   
+       var result = await service.ExtractDictionaryCandidatesAsync(
+           new Script { Text = "test" }, 
+           CancellationToken.None);
+   
+       Assert.That(result, Has.Count.EqualTo(2));
+       Assert.That(result.Any(c => c.Surface == "東京"), Is.True);
+       Assert.That(result.Any(c => c.Surface == "VOICEVOX"), Is.True);
+   }
+   ```
+
+6. **Test: 既存テストの修正（accent_type に統一）**
+   - 既存の `ExtractDictionaryCandidatesAsync_WhenValidJson_ReturnsDeduplicated` テストで使用している JSON を `accent_type` に修正：
+   ```csharp
+   [Test]
+   public async Task ExtractDictionaryCandidatesAsync_WhenValidJson_ReturnsDeduplicated()
+   {
+       var json = """{
+         \"candidates\": [
+           { \"surface\": \"VOICEVOX\", \"pronunciation\": \"ボイスボックス\", \"accent_type\": 1 },
+           { \"surface\": \"VOICEVOX\", \"pronunciation\": \"ボイスボックス\", \"accent_type\": 1 }
+         ]
+       }""";
+       var service = new AzureOpenAIService(
+           new FakeChatClient(json), 
+           NullLogger<AzureOpenAIService>.Instance, 
+           new LlmSettings());
+   
+       var result = await service.ExtractDictionaryCandidatesAsync(
+           new Script { Text = "test" }, 
+           CancellationToken.None);
+   
+       Assert.That(result, Has.Count.EqualTo(1));
+   }
+   ```
+
+**検証方法**:
+```bash
+dotnet test tests/VoicevoxHelper.Tests/VoicevoxHelper.Tests.csproj --filter "FullyQualifiedName~AzureOpenAIServiceTests"
 ```
 
 ---
 
-## Implementation Strategy（実装戦略）
+## Phase 5: 統合テスト・動作確認
 
-### MVP Scope（最小可能プロダクト）
+### Task 5.1: 手動動作確認
 
-**MVP = User Story 1のみ**（辞書候補抽出）
+**目的**: 実際のアプリケーションで、修正が正しく動作することを確認する。
 
-- 台本入力 → LLM抽出 → CSV出力 → 完了
-- US2（API登録）とUS3（リライト）は拡張機能として後から追加
+**確認手順**:
 
-### Incremental Delivery（段階的デリバリー）
+1. **再現入力でテスト**:
+   - 入力テキスト（ユーザー提供）:
+     ```
+     まずは１枚の絵に描いて説明する
+     
+     この重要性は、自分の頭の整理と人へ分かりやすく伝える上で明らかな話だと思います。
+     ここに新しく、AIに対して説明するというのが重要になってきました。AIであっても、全体像を的確に伝えた時とそうでない時で成果は変わります。
+     ```
+   - 期待される動作: 「AI」が候補に含まれる（固有名詞・専門用語として適切）
+   - 確認: 他に辞書登録が必要そうな語が無ければ、候補1件でも正常
 
-1. **Week 1**: Phase 1-2（Setup + Foundational）→ 基盤完成
-2. **Week 2**: Phase 3（US1）→ MVP完成
-3. **Week 3**: Phase 4（US2）→ フル機能版
-4. **Week 4**: Phase 5（US3）+ Phase 6（Polish）→ 完成版
+2. **日本語固有名詞を含む台本でテスト**:
+   - 入力テキスト:
+     ```
+     こんにちは、東京へようこそ。VOICEVOXで音声合成してみましょう。
+     ```
+   - 期待される動作: 「東京」「VOICEVOX」が候補に含まれる
+   - 確認: 両方とも日本語読み・アクセント核位置が提案される
+
+3. **アクセント核位置の確認**:
+   - 出力CSVまたはプレビュー画面で、`accent_type`（または `accentType`）が0以外の値を持つ候補が存在することを確認
+   - 例: 「VOICEVOX」→ accentType=3 など
+
+4. **ログ確認（spec.mdのログ方針に準拠）**:
+   - `appsettings.json` で `Logging.MinimumLevel` を `"Debug"` に設定
+   - 辞書抽出実行時のログで以下をUTCタイムスタンプ・エラー分類で確認：
+     - (OK) ログ出力: `ExtractDictionaryCandidates request. ScriptLength={Length}, MaskingApplied={IsMasked}`
+     - (OK) ログ出力: `ExtractDictionaryCandidates response. PromptTokens={PT}, CompletionTokens={CT}, TotalTokens={Total}, CandidateCount={Count}`
+     - (NG) ログに台本本文・LLMレスポンス内容は出力不可（機密性、FR-015準拠）
+     - (OK) パース失敗時: `LlmResponseParseException` が例外スタックに含まれることを確認（生レスポンスはスタックに含めない）
+
+### Task 5.2: Integration Test 追加（オプション）
+
+**File**: [tests/VoicevoxHelper.IntegrationTests/DictionaryExtractionFlowTests.cs](../../../tests/VoicevoxHelper.IntegrationTests/DictionaryExtractionFlowTests.cs)
+
+**目的**: エンドツーエンドのフロー（入力→マスキング→LLM呼び出し→パース→出力）をスタブで検証する。
+
+**実装内容**:
+- `FakeChatClient` を DI に注入し、固定レスポンス（日本語候補含む）を返す
+- `DictionaryExtractionInputViewModel.ExtractAsync()` を実行
+- `WorkflowState.ExtractedCandidates` に日本語候補が含まれることを確認
+
+**注意**: CIで実行するため、実APIへは接続しない。
 
 ---
 
-## Task Summary
+## Task Checklist
 
-| Phase | Task Count | Parallel Opportunities | Story Labels |
-|-------|-----------|------------------------|--------------|
-| 1: Setup | 13 | 3 | - |
-| 2: Foundational | 18 | 10 | - |
-| 3: US1 | 24 | 8 | [US1] |
-| 4: US2 | 20 | 5 | [US2] |
-| 5: US3 | 10 | 3 | [US3] |
-| 6: Polish | 21 | 21 | - |
-| **Total** | **106** | **50** | 3 Stories |
+- [ ] **Phase 1**: プロンプトテンプレート修正
+  - [ ] T1.1: `PromptTemplates.cs` を contracts に合わせて改善（日本語例追加、`accentType` に統一）
 
----
+- [ ] **Phase 2**: JSON構造化出力の強制
+  - [ ] T2.1: `OpenAiChatClient.cs` に `response_format: { type: "json_object" }` 追加
 
-## Format Validation
+- [ ] **Phase 3**: レスポンス契約の互換パース
+  - [ ] T3.1: `AzureOpenAIService.cs` にDTO追加とパース処理改善（ラッパー/配列両対応、snake/camel両対応）
 
-✅ **All tasks follow the checklist format**:
-- Checkbox: `- [ ]`
-- Task ID: Sequential (T001-T106)
-- [P] marker: Added to parallelizable tasks
-- [Story] label: Added to US1/US2/US3 tasks
-- Description: Clear action with file path
+- [ ] **Phase 4**: テストで回帰防止
+  - [ ] T4.1: `AzureOpenAIServiceTests.cs` に5つのテストケース追加
+  - [ ] T4.2: 全テスト実行・PASS確認
+
+- [ ] **Phase 5**: 統合テスト・動作確認
+  - [ ] T5.1: 再現入力での手動テスト
+  - [ ] T5.2: 日本語固有名詞を含む台本での手動テスト
+  - [ ] T5.3: ログでエンコード・JSON形式を確認
+  - [ ] T5.4: Integration Test 追加（オプション）
 
 ---
 
-## Next Steps
+## Success Criteria
 
-1. `quickstart.md`に従って開発環境をセットアップ
-2. Phase 1のタスクから順次実行
-3. 各タスク完了後にチェックボックスを`[x]`に更新
-4. Phase 2完了後、Phase 3-5を並行実装検討
-5. Phase 6で品質向上・ドキュメント整備
+以下の全てを満たすことで、本タスクリストは完了とする：
 
-**Ready to implement!** 🚀
+1. ✅ 全Unit Testがパスする（新規テスト含む）
+2. ✅ 日本語固有名詞（例: 東京、VOICEVOX）が辞書候補に含まれる
+3. ✅ アクセント核位置（`accentType`）が正しく反映される（0固定にならない）
+4. ✅ LLMレスポンスがJSON形式のみになる（コードフェンス・説明文混入なし）
+5. ✅ `{ "candidates": [...] }` 形式と `[...]` 形式の両方をパースできる
+6. ✅ `accent_type`（snake_case）と `accentType`（camelCase）の両方を受け入れる
+7. ✅ 既存機能（辞書登録、リライト）に影響がない（リグレッションなし）
+
+---
+
+## References
+
+- [plan.md](plan.md) - A-1) 辞書候補抽出の品質/互換性
+- [contracts/azure-openai-prompts.md](contracts/azure-openai-prompts.md) - 期待されるプロンプトとレスポンス形式
+- [src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs](../../../src/VoicevoxHelper.Infrastructure/LlmService/PromptTemplates.cs)
+- [src/VoicevoxHelper.Infrastructure/LlmService/OpenAiChatClient.cs](../../../src/VoicevoxHelper.Infrastructure/LlmService/OpenAiChatClient.cs)
+- [src/VoicevoxHelper.Infrastructure/LlmService/AzureOpenAIService.cs](../../../src/VoicevoxHelper.Infrastructure/LlmService/AzureOpenAIService.cs)
+- [tests/VoicevoxHelper.Tests/Infrastructure/LlmService/AzureOpenAIServiceTests.cs](../../../tests/VoicevoxHelper.Tests/Infrastructure/LlmService/AzureOpenAIServiceTests.cs)

@@ -485,19 +485,26 @@ VOICEVOX,ボイスボックス,3,PROPER_NOUN,7,製品名
 1. **プロンプト契約の明確化**
   - 辞書抽出プロンプトに「日本語の固有名詞/専門用語も対象」であることを明示し、短い日本語例（例: 東京、VOICEVOX 等）を追加する。
   - 「辞書登録が不要な一般語は抽出しない」方針は維持し、候補0件もあり得ることを許容する。
+  - **出力JSON形式を `accent_type`（snake_case）に統一** → プロンプト・実装・テスト全て統一
+
 2. **構造化出力（JSON mode）の強制**
   - Azure OpenAI 呼び出しで `response_format: { type: "json_object" }` 相当を指定し、JSON以外の出力を抑止する。
   - これにより、コードフェンス混入・説明文混入・途中でJSONが崩れる確率を下げる。
+  - **APIバージョン**: `2024-02-15-preview` 以上で `response_format` をサポート。不確定時は appsettings.json で `2024-08-01-preview` 指定。
+
 3. **レスポンス契約の互換パース**
   - 期待レスポンスは contracts に合わせて `{ "candidates": [ ... ] }` を正とする。
-  - 互換のためトップレベル配列 `[...]` も当面受け入れる（ただし candidates ラッパーがあるのに解析できない等は Fail-fast）。
-  - キー名は `accent_type` と `accentType` の両方を受け入れ、内部モデル（`DictionaryCandidate.AccentType`）へ正規化する。
+  - 暫定互換としてトップレベル配列 `[...]` も受け入れ（2026-Q2で廃止、警告ログ出力）。
+  - **キー名は `accent_type`（snake_case）のみをサポート**（`accentType` 互換は廃止）。
+
 4. **テストで回帰防止**
   - Unit Test で以下をカバーする:
-    - `{ candidates: [...] }` 形式がパースできる
-    - `accent_type`/`accentType` のどちらでも `AccentType` に反映される
-    - 日本語 surface を含む候補が欠落しない
+    - `{ candidates: [...] }` 形式（契約準拠）がパースできる
+    - `accent_type` を含むJSON正常パース
+    - トップレベル配列互換時に警告ログ出力
+    - パース失敗時は例外投出（Fail-fast、フォールバックなし）
   - Integration Test は外部APIへ接続せず、固定レスポンスのスタブでフローを検証する。
+  - ログ方針: spec.md/FR-015に準拠、台本・生レスポンス・APIキーは記録禁止（メトリクスのみ）。
 
 #### B) VOICEVOX エンジン（辞書API）
 
