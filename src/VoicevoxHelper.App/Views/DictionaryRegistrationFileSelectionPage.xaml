@@ -4,8 +4,11 @@
       xmlns:controls="clr-namespace:VoicevoxHelper.App.Views.Controls">
     <StackPanel Margin="24">
         <TextBlock Text="辞書API登録 - ファイル選択" FontSize="20" FontWeight="Bold" />
-        <TextBox Text="{Binding FilePath, UpdateSourceTrigger=PropertyChanged}" />
-        <Button Content="読み込み" Command="{Binding LoadCommand}" />
+        <DockPanel Margin="0,8,0,0">
+            <TextBox Text="{Binding FilePath}" IsReadOnly="True" DockPanel.Dock="Left" MinWidth="320" />
+            <Button Content="ファイルを選択" Command="{Binding BrowseFileCommand}" Margin="8,0,0,0" />
+        </DockPanel>
+        <Button Content="読み込み" Command="{Binding LoadCommand}" Margin="0,8,0,0" />
         <controls:ErrorDisplay Message="{Binding ErrorMessage}" />
     </StackPanel>
 </Page>

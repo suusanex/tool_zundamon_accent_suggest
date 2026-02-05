@@ -1,6 +1,7 @@
 <UserControl x:Class="VoicevoxHelper.App.Views.Controls.ErrorDisplay"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Visibility="Collapsed">
     <Border Background="#33FF0000" BorderBrush="#FFCC0000" BorderThickness="1" Padding="8" CornerRadius="4">
         <TextBlock Text="{Binding Message, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    Foreground="#FFAA0000" TextWrapping="Wrap" />

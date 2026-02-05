@@ -94,6 +94,7 @@ public partial class App : Application
 				services.AddSingleton<IMaskingService, PersonalInfoMaskingService>();
 				services.AddSingleton<ICsvParser, CsvDictionaryParser>();
 				services.AddSingleton<IJsonParser, JsonDictionaryParser>();
+				services.AddSingleton<IFileDialogService, FileDialogService>();
 				services.AddSingleton<IChatClient, OpenAiChatClient>();
 				services.AddSingleton<ILlmService, AzureOpenAIService>();
 				services.AddSingleton<IDictionaryRegistrationService, DictionaryRegistrationService>();

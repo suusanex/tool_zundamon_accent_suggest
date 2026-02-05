@@ -13,11 +13,21 @@ public partial class ErrorDisplay : UserControl
             nameof(Message),
             typeof(string),
             typeof(ErrorDisplay),
-            new PropertyMetadata(string.Empty));
+            new PropertyMetadata(string.Empty, OnMessageChanged));
 
     public ErrorDisplay()
     {
         InitializeComponent();
+    }
+
+    private static void OnMessageChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not ErrorDisplay control)
+        {
+            return;
+        }
+
+        control.Visibility = string.IsNullOrWhiteSpace(control.Message) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>

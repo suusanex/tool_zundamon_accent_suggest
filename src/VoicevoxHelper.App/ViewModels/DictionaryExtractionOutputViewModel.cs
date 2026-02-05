@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using System.Text;
 using VoicevoxHelper.App.Services;
 using VoicevoxHelper.Core.Interfaces;
 using VoicevoxHelper.Core.Models;
@@ -17,17 +18,20 @@ public sealed partial class DictionaryExtractionOutputViewModel : ViewModelBase
     private readonly ICsvParser _csvParser;
     private readonly IJsonParser _jsonParser;
     private readonly ILogger<DictionaryExtractionOutputViewModel> _logger;
+    private readonly IFileDialogService _fileDialogService;
 
     public DictionaryExtractionOutputViewModel(
         WorkflowState state,
         ICsvParser csvParser,
         IJsonParser jsonParser,
-        ILogger<DictionaryExtractionOutputViewModel> logger)
+        ILogger<DictionaryExtractionOutputViewModel> logger,
+        IFileDialogService fileDialogService)
     {
         _state = state;
         _csvParser = csvParser;
         _jsonParser = jsonParser;
         _logger = logger;
+        _fileDialogService = fileDialogService;
         Candidates = _state.DictionaryCandidates;
         OutputFormat = _state.OutputFormat;
         UpdateOutputText();
@@ -55,9 +59,18 @@ public sealed partial class DictionaryExtractionOutputViewModel : ViewModelBase
         {
             var extension = OutputFormat.Equals("JSON", StringComparison.OrdinalIgnoreCase) ? "json" : "csv";
             var defaultName = $"dictionary_{DateTime.Now:yyyy-MM-dd_HHmmss}.{extension}";
-            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), defaultName);
+            var filter = extension.Equals("json", StringComparison.OrdinalIgnoreCase)
+                ? "JSON ファイル (*.json)|*.json|すべてのファイル (*.*)|*.*"
+                : "CSV ファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*";
+            var path = _fileDialogService.ShowSaveFileDialog(defaultName, filter);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                _logger.LogInformation("User canceled saving output file.");
+                return;
+            }
+
             _logger.LogInformation("Saving {Format} output to {Path}", OutputFormat, path);
-            File.WriteAllText(path, OutputText);
+            File.WriteAllText(path, OutputText, new UTF8Encoding(true));
             _logger.LogInformation("Dictionary output saved to {Path}", path);
         }
         catch (Exception ex)

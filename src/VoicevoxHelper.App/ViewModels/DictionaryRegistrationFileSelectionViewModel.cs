@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using System.Text;
 using VoicevoxHelper.App.Services;
 using VoicevoxHelper.App.Views;
 using VoicevoxHelper.Core.Interfaces;
@@ -20,6 +21,7 @@ public sealed partial class DictionaryRegistrationFileSelectionViewModel : ViewM
     private readonly IJsonParser _jsonParser;
     private readonly INavigationService _navigationService;
     private readonly ILogger<DictionaryRegistrationFileSelectionViewModel> _logger;
+    private readonly IFileDialogService _fileDialogService;
     private readonly DictionaryCandidateValidator _validator = new();
 
     public DictionaryRegistrationFileSelectionViewModel(
@@ -27,13 +29,15 @@ public sealed partial class DictionaryRegistrationFileSelectionViewModel : ViewM
         ICsvParser csvParser,
         IJsonParser jsonParser,
         INavigationService navigationService,
-        ILogger<DictionaryRegistrationFileSelectionViewModel> logger)
+        ILogger<DictionaryRegistrationFileSelectionViewModel> logger,
+        IFileDialogService fileDialogService)
     {
         _state = state;
         _csvParser = csvParser;
         _jsonParser = jsonParser;
         _navigationService = navigationService;
         _logger = logger;
+        _fileDialogService = fileDialogService;
         FilePath = _state.SelectedFilePath;
     }
 
@@ -44,7 +48,13 @@ public sealed partial class DictionaryRegistrationFileSelectionViewModel : ViewM
     private void Load()
     {
         ErrorMessage = string.Empty;
-        if (string.IsNullOrWhiteSpace(FilePath) || !File.Exists(FilePath))
+        if (string.IsNullOrWhiteSpace(FilePath))
+        {
+            ErrorMessage = "ファイルを選択してください。";
+            return;
+        }
+
+        if (!File.Exists(FilePath))
         {
             _logger.LogWarning("Dictionary file not found: {FilePath}", FilePath);
             ErrorMessage = "ファイルが見つかりません。";
@@ -54,7 +64,7 @@ public sealed partial class DictionaryRegistrationFileSelectionViewModel : ViewM
         try
         {
             _logger.LogInformation("Loading dictionary file {FilePath}", FilePath);
-            var text = File.ReadAllText(FilePath);
+            var text = File.ReadAllText(FilePath, new UTF8Encoding(true));
             IReadOnlyList<DictionaryCandidate> candidates;
             if (Path.GetExtension(FilePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
             {
@@ -93,5 +103,20 @@ public sealed partial class DictionaryRegistrationFileSelectionViewModel : ViewM
             _logger.LogError(ex, "File load failed: {FilePath}", FilePath);
             ErrorMessage = "ファイルの読み込みに失敗しました。";
         }
+    }
+
+    [RelayCommand]
+    private void BrowseFile()
+    {
+        ErrorMessage = string.Empty;
+        var filter = "CSV ファイル (*.csv)|*.csv|JSON ファイル (*.json)|*.json|すべてのファイル (*.*)|*.*";
+        var selectedPath = _fileDialogService.ShowOpenFileDialog(filter);
+        if (string.IsNullOrWhiteSpace(selectedPath))
+        {
+            _logger.LogInformation("Dictionary file selection canceled.");
+            return;
+        }
+
+        FilePath = selectedPath;
     }
 }
