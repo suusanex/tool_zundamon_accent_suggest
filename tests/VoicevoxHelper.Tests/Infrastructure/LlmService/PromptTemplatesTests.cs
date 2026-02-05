@@ -7,8 +7,13 @@ namespace VoicevoxHelper.Tests.Infrastructure.LlmService;
 public class PromptTemplatesTests
 {
     [Test]
-    public void DictionaryExtractionSystem_ContainsConstraint()
+    public void DictionaryExtractionSystem_IncludesJapaneseExamplesAndAccentType()
     {
-        Assert.That(PromptTemplates.DictionaryExtractionSystem, Does.Contain("辞書候補抽出のみ"));
+        var prompt = PromptTemplates.DictionaryExtractionSystem;
+
+        Assert.That(prompt, Does.Contain("accent_type"));
+        Assert.That(prompt, Does.Contain("\"candidates\""));
+        Assert.That(prompt, Does.Contain("東京"));
+        Assert.That(prompt, Does.Contain("VOICEVOX"));
     }
 }

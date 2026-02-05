@@ -5,5 +5,9 @@ namespace VoicevoxHelper.Infrastructure.LlmService;
 /// </summary>
 public interface IChatClient
 {
-    Task<ChatCompletionResult> GetChatCompletionAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken);
+    Task<ChatCompletionResult> GetChatCompletionAsync(
+        string systemPrompt,
+        string userPrompt,
+        CancellationToken cancellationToken,
+        bool requireJson = false);
 }

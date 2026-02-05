@@ -460,18 +460,18 @@ dotnet test tests/VoicevoxHelper.Tests/VoicevoxHelper.Tests.csproj --filter "Ful
 
 ## Task Checklist
 
-- [ ] **Phase 1**: プロンプトテンプレート修正
-  - [ ] T1.1: `PromptTemplates.cs` を contracts に合わせて改善（日本語例追加、`accentType` に統一）
+- [X] **Phase 1**: プロンプトテンプレート修正
+  - [X] T1.1: `PromptTemplates.cs` を contracts に合わせて改善（日本語例追加、`accent_type` に統一）
 
-- [ ] **Phase 2**: JSON構造化出力の強制
-  - [ ] T2.1: `OpenAiChatClient.cs` に `response_format: { type: "json_object" }` 追加
+- [X] **Phase 2**: JSON構造化出力の強制
+  - [X] T2.1: `OpenAiChatClient.cs` に `response_format: { type: "json_object" }` 追加
 
-- [ ] **Phase 3**: レスポンス契約の互換パース
-  - [ ] T3.1: `AzureOpenAIService.cs` にDTO追加とパース処理改善（ラッパー/配列両対応、snake/camel両対応）
+- [X] **Phase 3**: レスポンス契約の互換パース
+  - [X] T3.1: `AzureOpenAIService.cs` にDTO追加とパース処理改善（ラッパー/配列両対応、snake_caseのみ）
 
-- [ ] **Phase 4**: テストで回帰防止
-  - [ ] T4.1: `AzureOpenAIServiceTests.cs` に5つのテストケース追加
-  - [ ] T4.2: 全テスト実行・PASS確認
+- [X] **Phase 4**: テストで回帰防止
+  - [X] T4.1: `AzureOpenAIServiceTests.cs` に5つのテストケース追加
+  - [X] T4.2: 全テスト実行・PASS確認
 
 - [ ] **Phase 5**: 統合テスト・動作確認
   - [ ] T5.1: 再現入力での手動テスト
@@ -490,7 +490,7 @@ dotnet test tests/VoicevoxHelper.Tests/VoicevoxHelper.Tests.csproj --filter "Ful
 3. ✅ アクセント核位置（`accentType`）が正しく反映される（0固定にならない）
 4. ✅ LLMレスポンスがJSON形式のみになる（コードフェンス・説明文混入なし）
 5. ✅ `{ "candidates": [...] }` 形式と `[...]` 形式の両方をパースできる
-6. ✅ `accent_type`（snake_case）と `accentType`（camelCase）の両方を受け入れる
+6. ✅ `accent_type`（snake_case）のみを受け入れる
 7. ✅ 既存機能（辞書登録、リライト）に影響がない（リグレッションなし）
 
 ---

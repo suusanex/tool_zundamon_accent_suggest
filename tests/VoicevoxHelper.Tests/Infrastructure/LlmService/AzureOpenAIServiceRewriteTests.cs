@@ -10,7 +10,11 @@ public class AzureOpenAIServiceRewriteTests
 {
     private sealed class FakeChatClient : IChatClient
     {
-        public Task<ChatCompletionResult> GetChatCompletionAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken)
+        public Task<ChatCompletionResult> GetChatCompletionAsync(
+            string systemPrompt,
+            string userPrompt,
+            CancellationToken cancellationToken,
+            bool requireJson = false)
         {
             return Task.FromResult(new ChatCompletionResult
             {

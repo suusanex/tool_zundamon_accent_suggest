@@ -29,6 +29,7 @@ public sealed class LlmSettings
     public string Endpoint { get; init; } = string.Empty;
     public string ApiKey { get; init; } = string.Empty;
     public string Deployment { get; init; } = string.Empty;
+    public string ApiVersion { get; init; } = "2024-02-15-preview";
     public int TimeoutSeconds { get; init; } = 60;
     public decimal PromptCostPer1kTokens { get; init; } = 0m;
     public decimal CompletionCostPer1kTokens { get; init; } = 0m;

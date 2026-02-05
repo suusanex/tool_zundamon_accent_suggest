@@ -1,8 +1,9 @@
+using System.Globalization;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.WebUtilities;
 using VoicevoxHelper.Core.Exceptions;
 using VoicevoxHelper.Core.Interfaces;
 using VoicevoxHelper.Core.Models;
@@ -60,7 +61,8 @@ public sealed class VoicevoxApiClient : IVoicevoxApiClient
         const string path = "/user_dict_word";
         LogVoicevoxRequest(operation, HttpMethod.Post, path, FormatEntry(entry));
 
-        var response = await _httpClient.PostAsJsonAsync(path, entry, cancellationToken);
+        var uri = QueryHelpers.AddQueryString(path, BuildEntryQueryParameters(entry));
+        var response = await _httpClient.PostAsync(uri, null, cancellationToken);
         var body = await ReadAndLogResponseAsync(operation, response, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -70,8 +72,7 @@ public sealed class VoicevoxApiClient : IVoicevoxApiClient
                 new HttpRequestException($"VOICEVOX {(int)response.StatusCode}: {Summarize(body, 512)}"));
         }
 
-        var doc = JsonDocument.Parse(body);
-        return doc.RootElement.GetProperty("uuid").GetString() ?? string.Empty;
+        return NormalizeUuidResponse(body);
     }
 
     public async Task UpdateWordAsync(string uuid, VoicevoxDictionaryEntry entry, CancellationToken cancellationToken)
@@ -79,8 +80,8 @@ public sealed class VoicevoxApiClient : IVoicevoxApiClient
         const string operation = "UpdateWord";
         var path = $"/user_dict_word/{uuid}";
         LogVoicevoxRequest(operation, HttpMethod.Put, path, FormatEntry(entry));
-
-        var response = await _httpClient.PutAsJsonAsync(path, entry, cancellationToken);
+        var uri = QueryHelpers.AddQueryString(path, BuildEntryQueryParameters(entry));
+        var response = await _httpClient.PutAsync(uri, null, cancellationToken);
         var body = await ReadAndLogResponseAsync(operation, response, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -123,6 +124,33 @@ public sealed class VoicevoxApiClient : IVoicevoxApiClient
     private string FormatEntry(VoicevoxDictionaryEntry entry)
     {
         return $"surface={entry.Surface}, pronunciation={entry.Pronunciation}, accentType={entry.AccentType}";
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildEntryQueryParameters(VoicevoxDictionaryEntry entry)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["surface"] = entry.Surface,
+            ["pronunciation"] = entry.Pronunciation,
+            ["accent_type"] = entry.AccentType.ToString(CultureInfo.InvariantCulture)
+        };
+
+        if (entry.Priority != 5)
+        {
+            parameters["priority"] = entry.Priority.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return parameters;
+    }
+
+    private static string NormalizeUuidResponse(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return string.Empty;
+        }
+
+        return body.Trim().Trim('"');
     }
 
     private static string Summarize(string value, int maxLength = 512)

@@ -19,7 +19,11 @@ public class DictionaryExtractionFlowTests
             _response = response;
         }
 
-        public Task<ChatCompletionResult> GetChatCompletionAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken)
+        public Task<ChatCompletionResult> GetChatCompletionAsync(
+            string systemPrompt,
+            string userPrompt,
+            CancellationToken cancellationToken,
+            bool requireJson = false)
         {
             return Task.FromResult(new ChatCompletionResult
             {
@@ -36,7 +40,7 @@ public class DictionaryExtractionFlowTests
     {
         var masking = new PersonalInfoMaskingService();
         var llm = new AzureOpenAIService(
-            new FakeChatClient("[{\"surface\":\"VOICEVOX\",\"pronunciation\":\"ボイスボックス\",\"accentType\":1}]"),
+            new FakeChatClient("{\"candidates\":[{\"surface\":\"VOICEVOX\",\"pronunciation\":\"ボイスボックス\",\"accent_type\":1}]}"),
             NullLogger<AzureOpenAIService>.Instance,
             new LlmSettings());
         var csv = new CsvDictionaryParser();
